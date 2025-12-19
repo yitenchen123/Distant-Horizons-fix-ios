@@ -62,7 +62,7 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	private static final Map<ServerLevel, WeakReference<ServerLevelWrapper>> LEVEL_WRAPPER_REF_BY_SERVER_LEVEL = Collections.synchronizedMap(new WeakHashMap<>());
 	
 	private final ServerLevel level;
-	private IDhLevel dhLevel;
+	private volatile IDhLevel dhLevel;
 	
 	/** 
 	 * this name is cached to prevent issues during shutdown where

@@ -102,20 +102,31 @@ public abstract class MixinMinecraft
 	@Inject(at = @At("HEAD"), method = "updateLevelInEngines")
 	public void updateLevelInEngines(ClientLevel level, CallbackInfo ci)
 	{
-		if (this.lastLevel != null && level != this.lastLevel)
+		// Skip normal level events when Immersive Portals is active
+		// IP suppresses these events and we use render-driven loading instead
+		if (!com.seibel.distanthorizons.common.ImmersivePortalsCompat.isImmersivePortalsActive())
 		{
-			ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(this.lastLevel));
+			if (this.lastLevel != null && level != this.lastLevel)
+			{
+				ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(this.lastLevel));
+			}
+
+			if (level != null)
+			{
+				ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(level, true));
+			}
 		}
-		
-		if (level != null)
-		{
-			ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(level, true));
-		}
-		
+
 		this.lastLevel = level;
 	}
 	
 	@Inject(at = @At("HEAD"), method = "close()V")
 	public void close(CallbackInfo ci) { SelfUpdater.onClose(); }
+	
+	@Inject(at = @At("HEAD"), method = "tick")
+	private void onTick(CallbackInfo ci)
+	{
+		ClientLevelWrapper.tickCleanup();
+	}
 	
 }

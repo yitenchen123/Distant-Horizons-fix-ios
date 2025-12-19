@@ -171,6 +171,23 @@ public class MixinLevelRenderer
 		ClientApi.RENDER_STATE.partialTickTime = MinecraftRenderWrapper.INSTANCE.getPartialTickTime();
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
 	    
+	    if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
+	    {
+		    ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
+		    
+		    // Apply Immersive Portals compatibility only when IP is detected
+		    if (com.seibel.distanthorizons.common.ImmersivePortalsCompat.isImmersivePortalsActive())
+		    {
+			    if (!wrapper.isDhLevelLoaded())
+			    {
+				    LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
+				    ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
+			    }
+		    }
+		    
+		    wrapper.markRendered();
+	    }
+	    
 	    
 	    
 	    #if MC_VER < MC_1_21_6
@@ -195,6 +212,11 @@ public class MixinLevelRenderer
 	{
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
+		
+		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
+		{
+			((ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper).markRendered();
+		}
 		
 		// only crash during development
 		if (ModInfo.IS_DEV_BUILD)

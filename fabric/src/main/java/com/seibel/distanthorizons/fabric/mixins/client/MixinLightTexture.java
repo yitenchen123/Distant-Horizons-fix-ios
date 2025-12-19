@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.fabric.mixins.client;
 
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
@@ -91,7 +92,12 @@ public class MixinLightTexture
 			return;
 		}
 		
-		IClientLevelWrapper clientLevel = mc.getWrappedClientLevel();
+		IClientLevelWrapper clientLevel = ClientApi.RENDER_STATE.clientLevelWrapper;
+		if (clientLevel == null)
+		{
+			clientLevel = mc.getWrappedClientLevel();
+		}
+		
 		if (clientLevel == null)
 		{
 			return;

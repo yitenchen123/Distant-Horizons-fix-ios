@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.level.*;
@@ -79,9 +80,9 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	
 	private boolean cloudColorFailLogged = false;
 	
-	private BlockStateWrapper dirtBlockWrapper;
-	private IDhLevel dhLevel;
-	
+	private volatile BlockStateWrapper dirtBlockWrapper;
+	private volatile IDhLevel dhLevel;
+	private volatile long lastRenderTime = System.currentTimeMillis();
 	
 	
 	//=============//
@@ -99,6 +100,55 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	// instance methods //
 	//==================//
 	//region
+	
+	public synchronized void markRendered() {
+		this.lastRenderTime = System.currentTimeMillis();
+	}
+	public long getLastRenderTime() { return this.lastRenderTime; }
+	public boolean isDhLevelLoaded() {
+		return this.dhLevel != null;
+	}
+	
+	public static void tickCleanup()
+	{
+		if (MINECRAFT.level == null) { return; }
+
+		long currentTime = System.currentTimeMillis();
+		long timeout = 30 * 1000;
+
+		java.util.List<ClientLevelWrapper> toUnload = new java.util.ArrayList<>();
+
+		synchronized(LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
+		{
+			for (java.lang.ref.WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
+			{
+				ClientLevelWrapper wrapper = ref.get();
+				if (wrapper != null && wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level)
+				{
+					if (currentTime - wrapper.getLastRenderTime() > timeout)
+					{
+						toUnload.add(wrapper);
+					}
+				}
+			}
+		}
+
+		for (ClientLevelWrapper wrapper : toUnload)
+		{
+			// Re-verify all conditions inside a synchronized block on the wrapper 
+			// to ensure atomicity with respect to markRendered()
+			synchronized(wrapper)
+			{
+				if (wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastRenderTime() > timeout)
+				{
+					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
+					ClientApi.INSTANCE.clientLevelUnloadEvent(wrapper);
+				}
+			}
+		}
+	}
+	
+	
 	
 	/** 
 	 * can be used when speed is important and the same level is likely to be passed in,
