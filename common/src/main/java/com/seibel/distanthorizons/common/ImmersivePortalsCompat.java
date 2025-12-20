@@ -86,7 +86,10 @@ public class ImmersivePortalsCompat
 	 */
 	public static void resetDetection()
 	{
-		isImmersivePortalsPresent = null;
-		isImmersivePortalsActive = null;
+		synchronized (ImmersivePortalsCompat.class)
+		{
+			isImmersivePortalsPresent = null;
+			isImmersivePortalsActive = null;
+		}
 	}
 }

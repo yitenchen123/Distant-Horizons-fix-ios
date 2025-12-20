@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
@@ -104,7 +105,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	public synchronized void markRendered() {
 		this.lastRenderTime = System.currentTimeMillis();
 	}
-	public long getLastRenderTime() { return this.lastRenderTime; }
+	public synchronized long getLastRenderTime() { return this.lastRenderTime; }
 	public boolean isDhLevelLoaded() {
 		return this.dhLevel != null;
 	}
@@ -125,6 +126,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 				ClientLevelWrapper wrapper = ref.get();
 				if (wrapper != null && wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level)
 				{
+					// We use the synchronized getter to prevent race conditions with markRendered()
 					if (currentTime - wrapper.getLastRenderTime() > timeout)
 					{
 						toUnload.add(wrapper);
@@ -148,6 +150,23 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		}
 	}
 	
+	@Nullable
+	public static ClientLevelWrapper getWrapperByDimensionName(String dimensionName)
+	{
+		synchronized (LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
+		{
+			for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
+			{
+				ClientLevelWrapper wrapper = ref.get();
+				if (wrapper != null && wrapper.getDimensionName().equals(dimensionName))
+				{
+					return wrapper;
+				}
+			}
+		}
+		return null;
+	}
+	
 	
 	
 	/** 
@@ -157,9 +176,24 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Nullable
 	public static IClientLevelWrapper getWrapperIfDifferent(@Nullable IClientLevelWrapper levelWrapper, @NotNull ClientLevel level)
 	{
-		if (KEYED_CLIENT_LEVEL_MANAGER.isEnabled() && KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel() != levelWrapper)
+		if (KEYED_CLIENT_LEVEL_MANAGER.isEnabled())
 		{
-			return getWrapper(level);
+			IServerKeyedClientLevel keyedLevel = null;
+			if (KEYED_CLIENT_LEVEL_MANAGER instanceof KeyedClientLevelManager)
+			{
+				keyedLevel = ((KeyedClientLevelManager) KEYED_CLIENT_LEVEL_MANAGER).getServerKeyedLevel(level);
+			}
+			else
+			{
+				// FIXME: If the implementation is not KeyedClientLevelManager, 
+				// this fallback may return the key for the wrong dimension in multiverse scenarios.
+				keyedLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			}
+			
+			if (keyedLevel != levelWrapper)
+			{
+				return getWrapper(level);
+			}
 		}
 		
 		ClientLevelWrapper clientLevelWrapper = (ClientLevelWrapper)levelWrapper;
@@ -186,7 +220,18 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 			}
 			
 			// used if the client is connected to a server that defines the currently loaded level
-			IServerKeyedClientLevel overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			IServerKeyedClientLevel overrideLevel = null;
+			if (KEYED_CLIENT_LEVEL_MANAGER instanceof KeyedClientLevelManager)
+			{
+				overrideLevel = ((KeyedClientLevelManager) KEYED_CLIENT_LEVEL_MANAGER).getServerKeyedLevel(level);
+			}
+			else
+			{
+				// FIXME: If the implementation is not KeyedClientLevelManager, 
+				// this fallback may return the key for the wrong dimension in multiverse scenarios.
+				overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			}
+			
 			if (overrideLevel != null)
 			{
 				return overrideLevel;
@@ -417,6 +462,22 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		this.dimMinHeight = this.level.getMinY();
         #endif
 		return this.dimMinHeight;
+	}
+	
+	public IChunkWrapper tryGetChunk(DhChunkPos pos)
+	{
+		if (!this.level.hasChunk(pos.getX(), pos.getZ()))
+		{
+			return null;
+		}
+		
+		ChunkAccess chunk = this.level.getChunk(pos.getX(), pos.getZ(), ChunkStatus.EMPTY, false);
+		if (chunk == null)
+		{
+			return null;
+		}
+		
+		return new ChunkWrapper(chunk, this);
 	}
 	
 	@Override
