@@ -99,34 +99,24 @@ public abstract class MixinMinecraft
 	}
 	#endif
 	
-	@Inject(at = @At("HEAD"), method = "updateLevelInEngines")
-	public void updateLevelInEngines(ClientLevel level, CallbackInfo ci)
-	{
-		// Skip normal level events when Immersive Portals is active
-		// IP suppresses these events and we use render-driven loading instead
-		if (!com.seibel.distanthorizons.common.ImmersivePortalsCompat.isImmersivePortalsActive())
-		{
-			if (this.lastLevel != null && level != this.lastLevel)
-			{
-				ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(this.lastLevel));
-			}
-
-			if (level != null)
-			{
-				ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(level, true));
-			}
-		}
-
-		this.lastLevel = level;
-	}
+	// Level load/unload is handled via renderer-driven loading for Immersive Portals
+	// and via render hooks in MixinLevelRenderer. Avoid duplicating level
+	// load/unload logic here to keep a single, consistent system.
 	
 	@Inject(at = @At("HEAD"), method = "close()V")
 	public void close(CallbackInfo ci) { SelfUpdater.onClose(); }
 	
-	@Inject(at = @At("HEAD"), method = "tick")
-	private void onTick(CallbackInfo ci)
+	// Use a dedicated timer for cleanup instead of MC tick events
+	@Unique
+	private static final java.util.Timer CLIENT_CLEANUP_TIMER = com.seibel.distanthorizons.core.util.TimerUtil.CreateTimer("ClientLevelTickCleanup");
+
+	@Unique
+	private static final java.util.TimerTask CLIENT_CLEANUP_TASK = com.seibel.distanthorizons.core.util.TimerUtil.createTimerTask(() -> com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.tickCleanup());
+
+	static
 	{
-		ClientLevelWrapper.tickCleanup();
+		// 20 ticks per second (50ms interval)
+		CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
 	}
 	
 }

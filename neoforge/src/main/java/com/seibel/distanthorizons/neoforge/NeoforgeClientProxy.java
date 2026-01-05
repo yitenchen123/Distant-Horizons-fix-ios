@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.neoforge;
 
 import com.seibel.distanthorizons.common.AbstractModInitializer;
+import com.seibel.distanthorizons.common.ImmersivePortalsCompat;
 import com.seibel.distanthorizons.common.util.ProxyUtil;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
@@ -51,6 +52,7 @@ import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.opengl.GL32;
+import com.seibel.distanthorizons.common.ImmersivePortalsCompat;
 
 #if MC_VER < MC_1_20_6
 import net.neoforged.neoforge.event.TickEvent;
@@ -162,11 +164,17 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 				{
 					//LOGGER.trace("break or block attack at blockPos: " + event.getPos());
 					
+					LevelAccessor level = event.getLevel();
 					ChunkAccess chunk = level.getChunk(event.getPos());
-					SharedApi.INSTANCE.applyChunkUpdate(new ChunkWrapper(chunk, wrappedLevel), wrappedLevel);
+					this.onBlockChangeEvent(level, chunk);
 				});
 			}
 		}
+	}
+	private void onBlockChangeEvent(LevelAccessor level, ChunkAccess chunk)
+	{
+		ILevelWrapper wrappedLevel = ProxyUtil.getLevelWrapper(level);
+		SharedApi.INSTANCE.chunkBlockChangedEvent(new ChunkWrapper(chunk, wrappedLevel), wrappedLevel);
 	}
 	
 	
@@ -234,6 +242,21 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		// handled via the same mixin as fabric for consistency
 		#endif
 		
+		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
+		{
+			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
+			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			{
+				if (!wrapper.isDhLevelLoaded())
+				{
+					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
+					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
+				}
+			}
+			
+			wrapper.markRendered();
+		}
+		
 		ClientApi.INSTANCE.renderFadeOpaque();
 	}
 	
@@ -248,6 +271,21 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		#else
 		// handled via the same mixin as fabric for consistency
 		#endif
+
+		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
+		{
+			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
+			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			{
+				if (!wrapper.isDhLevelLoaded())
+				{
+					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
+					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
+				}
+			}
+
+			wrapper.markRendered();
+		}
 	}
 	
 	@SubscribeEvent
@@ -260,8 +298,22 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		#else
 		// handled via the same mixin as fabric for consistency
 		#endif
-		
-		
+
+		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
+		{
+			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
+			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			{
+				if (!wrapper.isDhLevelLoaded())
+				{
+					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
+					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
+				}
+			}
+
+			wrapper.markRendered();
+		}
+
 		try
 		{
 			// should generally only need to be set once per game session
