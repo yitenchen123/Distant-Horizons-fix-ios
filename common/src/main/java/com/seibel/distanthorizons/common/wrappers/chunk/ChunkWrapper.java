@@ -671,11 +671,4 @@ public class ChunkWrapper implements IChunkWrapper
 	//
 	//	return this.blockBiomeHashCode;
 	//}
-
-	@Override
-	public IChunkWrapper copy()
-	{
-		return new ChunkWrapper(this.chunk, this.wrappedLevel, false);
-	}
-
 }
