@@ -434,6 +434,7 @@ if (isNotCommonProject) {
             issues                       : rootProject.mod_issues,
             discord                      : rootProject.mod_discord,
             minecraft_version            : rootProject.minecraft_version,
+            accessWidenerVersion         : rootProject.accessWidenerVersion,
             compatible_minecraft_versions: rootProject.compatible_minecraft_versions,
             compatible_forgemc_versions  : compatible_forgemc_versions,
             java_version                 : rootProject.java_version,
@@ -464,11 +465,11 @@ if (isNotCommonProject) {
 
     // ==================== Resource Copy Tasks ====================
 
-    task copyCommonLoaderResources(type: Copy) {
-        from project(":common").file("src/main/resources/${rootProject.accessWidenerVersion}.distanthorizons.accesswidener")
-        into(file(project.file("build/resources/main")))
-        rename "${rootProject.accessWidenerVersion}.distanthorizons.accesswidener", "distanthorizons.accesswidener"
-    }
+    // task copyCommonLoaderResources(type: Copy) {
+    //     from project(":common").file("src/main/resources/${rootProject.accessWidenerVersion}.distanthorizons.accesswidener")
+    //     into(file(project.file("build/resources/main")))
+    //     rename "${rootProject.accessWidenerVersion}.distanthorizons.accesswidener", "distanthorizons.accesswidener"
+    // }
 
     task copyCoreResources(type: Copy) {
         from fileTree(project(":core").file("src/main/resources"))

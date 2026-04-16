@@ -76,12 +76,12 @@ task deleteResources(type: Delete) {
 
 processResources {
     dependsOn(copyCoreResources)
-    dependsOn(copyCommonLoaderResources)
+    // dependsOn(copyCommonLoaderResources)
 }
 
 tasks.named('runClient') {
     dependsOn(copyCoreResources)
-    dependsOn(copyCommonLoaderResources)
+    // dependsOn(copyCommonLoaderResources)
     finalizedBy(deleteResources)
 }
 
