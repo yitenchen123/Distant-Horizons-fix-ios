@@ -210,9 +210,12 @@ public class GLBuffer implements AutoCloseable
 		
 		
 		
-		// re-binding the old VBO is necessary for old MC versions (IE 1.16.5 and older)
-		// otherwise the screen may be black when on the home menu
-		int previousBoundVbo = GL32.glGetInteger(GL32.GL_ARRAY_BUFFER_BINDING);
+		// re-binding the old buffers is necessary for old MC versions for the following reasons:
+		// for 16.5 and older the screen may be black when on the home menu
+		// and for 1.19.2 - 1.21.4 the inventory/UI will render without a background
+		int vao = GL32.glGetInteger(GL32.GL_VERTEX_ARRAY_BINDING);
+		int vbo = GL32.glGetInteger(GL32.GL_ARRAY_BUFFER_BINDING);
+		int ebo = GL32.glGetInteger(GL32.GL_ELEMENT_ARRAY_BUFFER_BINDING);
 		
 		try
 		{
@@ -238,7 +241,9 @@ public class GLBuffer implements AutoCloseable
 		}
 		finally
 		{
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, GL32.glIsBuffer(previousBoundVbo) ? previousBoundVbo : 0);
+			GL32.glBindVertexArray(GL32.glIsVertexArray(vao) ? vao : 0);
+			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, GL32.glIsBuffer(vbo) ? vbo : 0);
+			GL32.glBindBuffer(GL32.GL_ELEMENT_ARRAY_BUFFER, GL32.glIsBuffer(ebo) ? ebo: 0);
 		}
 	}
 	/** Requires the buffer to be bound */
