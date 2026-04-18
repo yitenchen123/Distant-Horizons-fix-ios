@@ -55,6 +55,12 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 import java.util.function.Consumer;
 
+#if MC_VER >= MC_1_21_11
+import com.seibel.distanthorizons.api.enums.config.EDhApiRenderApi;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.*;
+import static com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Experimental.renderingApi;
+#endif
+
 #if MC_VER < MC_1_20_6
 import net.neoforged.neoforge.client.ConfigScreenHandler;
 #elif MC_VER < MC_1_21_8
@@ -162,6 +168,13 @@ public class NeoforgeMain extends AbstractModInitializer
 				() -> (client, parent) -> GetConfigScreen.getScreen(parent));
 		#endif
 		
+		
+		#if MC_VER >= MC_1_21_11
+		IModChecker modChecker = SingletonInjector.INSTANCE.get(IModChecker.class);
+		if(modChecker.isModLoaded("iris")) {
+			renderingApi.setApiValue(EDhApiRenderApi.OPEN_GL);
+		}
+		#endif
 	}
 	
 	@Override
