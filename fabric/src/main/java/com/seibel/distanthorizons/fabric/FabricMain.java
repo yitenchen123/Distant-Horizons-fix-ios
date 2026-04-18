@@ -51,6 +51,10 @@ import net.minecraft.resources.ResourceLocation;
 #else
 import net.minecraft.resources.Identifier;
 #endif
+	
+	#if MC_VER >= MC_1_21_11
+import static com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Experimental.renderingApi;
+#endif
 
 import java.util.function.Consumer;
 
@@ -120,6 +124,13 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		// 1.19.4 is the lowest version Iris supports DH
 		this.tryCreateModCompatAccessor("iris", IIrisAccessor.class, IrisAccessor::new);
 		#endif
+		
+		
+		#if MC_VER >= MC_1_21_11
+		if(modChecker.isModLoaded("iris")) {
+			renderingApi.setApiValue(EDhApiRenderApi.OPEN_GL);
+		}
+			#endif
 	}
 	
 	@Override
