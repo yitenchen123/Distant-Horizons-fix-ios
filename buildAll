@@ -20,10 +20,6 @@ for d in versionProperties/*; do
   sh gradlew build -PmcVer=$version
   if [ $? != 0 ]; then continue; fi
 
-  echo "==================== Merging $version ===================="
-  sh gradlew mergeJars -PmcVer=$version
-  if [ $? != 0 ]; then continue; fi
-  
   echo "==================== Moving jar ===================="
   mv build/forgix/*.jar buildAllJars/
 done

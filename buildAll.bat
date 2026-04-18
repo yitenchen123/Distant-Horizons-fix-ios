@@ -20,9 +20,6 @@ for %%f in (versionProperties\*) do (
 	echo ==================== Building !version! ====================
     call .\gradlew.bat build -PmcVer="!version!"
     
-	echo ==================== Merging !version! ====================
-    call .\gradlew.bat mergeJars -PmcVer="!version!"
-	
     echo ==================== Moving jar ====================
     move build\forgix\*.jar buildAllJars\
 )
