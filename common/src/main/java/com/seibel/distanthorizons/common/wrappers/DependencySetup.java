@@ -25,7 +25,7 @@ import com.seibel.distanthorizons.common.render.blaze.BlazeDhRenderApiDefinition
 import com.seibel.distanthorizons.common.render.openGl.GlDhRenderApiDefinition;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.render.renderer.GenericRenderObjectFactory;
-import com.seibel.distanthorizons.common.wrappers.gui.ClassicConfigGUI;
+import com.seibel.distanthorizons.common.wrappers.gui.classicConfig.ClassicConfigGUI;
 import com.seibel.distanthorizons.common.wrappers.gui.LangWrapper;
 import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftServerWrapper;

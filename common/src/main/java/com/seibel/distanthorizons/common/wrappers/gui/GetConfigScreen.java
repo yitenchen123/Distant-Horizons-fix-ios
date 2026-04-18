@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.gui;
 
+import com.seibel.distanthorizons.common.wrappers.gui.classicConfig.ClassicConfigGUI;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.coreapi.ModInfo;
