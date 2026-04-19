@@ -12,11 +12,9 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.core.enums.MinecraftTextFormat;
 import com.seibel.distanthorizons.core.generation.DhLightingEngine;
-import com.seibel.distanthorizons.core.level.DhServerLevel;
 import com.seibel.distanthorizons.core.level.IDhServerLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.TimerUtil;
@@ -195,12 +193,22 @@ public class InternalServerGenerator
 		}
 		finally
 		{
+			ArrayList<CompletableFuture<Void>> releaseFutures = new ArrayList<>();
+			
 			// release all chunks from the server to prevent out of memory issues
 			Iterator<ChunkPos> chunkPosIterator = ChunkPosGenStream.getIterator(genEvent.minPos.getX(), genEvent.minPos.getZ(), genEvent.widthInChunks, 0);
 			while (chunkPosIterator.hasNext())
 			{
 				ChunkPos chunkPos = chunkPosIterator.next();
-				this.releaseChunkFromServer(this.params.mcServerLevel, this.params.dhServerLevel, chunkPos);
+				releaseFutures.add(this.releaseChunkFromServerAsync(this.params.mcServerLevel, chunkPos));
+			}
+			
+			// wait for all release futures to finish to prevent an issue where DH queues
+			// tickets faster than MC can clear them out
+			for (int i = 0; i < releaseFutures.size(); i++)
+			{
+				CompletableFuture<Void> releaseFuture = releaseFutures.get(i);
+				releaseFuture.join();
 			}
 		}
 	}
@@ -286,8 +294,10 @@ public class InternalServerGenerator
 	 * mitigates out of memory issues in the vanilla chunk system. <br>
 	 * See: https://github.com/pop4959/Chunky/pull/383
 	 */
-	private void releaseChunkFromServer(ServerLevel level, IDhServerLevel dhLevel, ChunkPos chunkPos)
+	private CompletableFuture<Void> releaseChunkFromServerAsync(ServerLevel level, ChunkPos chunkPos)
 	{
+		CompletableFuture<Void> removeTicketFuture = new CompletableFuture<>();
+		
 		level.getChunkSource().chunkMap.mainThreadExecutor.execute(() ->
 		{
 			try
@@ -323,9 +333,15 @@ public class InternalServerGenerator
 			}
 			catch (Exception e)
 			{
-				LOGGER.warn("Failed to release chunk back to internal server. Error: ["+e.getMessage()+"]", e);
+				LOGGER.warn("Failed to release chunk ["+chunkPos+"] back to internal server. Error: ["+e.getMessage()+"]", e);
+			}
+			finally
+			{
+				removeTicketFuture.complete(null);
 			}
 		});
+		
+		return removeTicketFuture;
 	}
 	
 	
