@@ -376,11 +376,14 @@ public abstract class AbstractModInitializer
 			// Iris only supports native OpenGL
 			if (renderApi != EDhApiRenderApi.OPEN_GL)
 			{
-				String irisUnsupportedMessage = "Iris does not support DH when using the [" + EDhApiRenderApi.BLAZE_3D + "] rendering API, this will need to be fixed on Iris end.\nRendering API will be auto-changed to [" + EDhApiRenderApi.OPEN_GL + "].";
-				LOGGER.error(irisUnsupportedMessage);
-				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, irisUnsupportedMessage, "ok", "warning");
+				String irisUnsupportedMessage = "Iris doesn't support DH when using the ["+EDhApiRenderApi.BLAZE_3D+"] rendering API, this will need to be fixed on Iris end. As a temporary fix please change the rendering API to ["+EDhApiRenderApi.OPEN_GL+"] in the DH config file.";
+				LOGGER.fatal(irisUnsupportedMessage);
+				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, irisUnsupportedMessage, "ok", "error");
 				
-				Config.Client.Advanced.Graphics.Experimental.renderingApi.set(EDhApiRenderApi.OPEN_GL);
+				IMinecraftClientWrapper mc = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+				String errorMessage = "loading Distant Horizons. "+irisUnsupportedMessage;
+				String exceptionError = "Distant Horizons conditional mod config Exception";
+				mc.crashMinecraft(errorMessage, new Exception(exceptionError));
 			}
 		}
 		
