@@ -299,27 +299,27 @@ public class BlazeDebugWireframeRenderer extends AbstractDebugWireframeRenderer
 		
 		// render //
 		
-		//try (RenderPass renderPass = commandEncoder.createRenderPass(
-		//	this::getRenderPassName,
-		//	BlazeDhMetaRenderer.INSTANCE.dhColorTextureWrapper.textureView, 
-		//	/*optionalClearColorAsInt*/ OptionalInt.empty(),
-		//	BlazeDhMetaRenderer.INSTANCE.dhDepthTextureWrapper.textureView, 
-		//	/*optionalDepthValueAsDouble*/ OptionalDouble.empty()))
-		//{
-		//	// Bind instance data //
-		//	renderPass.setUniform("uniformBlock", this.uniformBuffer);
-		//	
-		//	renderPass.setPipeline(this.pipeline);
-		//	renderPass.setIndexBuffer(this.boxIndexBuffer, VertexFormat.IndexType.INT);
-		//	
-		//	renderPass.setVertexBuffer(0, this.boxVertexBuffer);
-		//	
-		//	renderPass.drawIndexed(
-		//		/*indexStart*/ 0,
-		//		/*firstIndex*/0,
-		//		/*indexCount*/BOX_OUTLINE_INDICES.length,
-		//		/*instanceCount*/1);
-		//}
+		try (RenderPass renderPass = commandEncoder.createRenderPass(
+			this::getRenderPassName,
+			BlazeDhMetaRenderer.INSTANCE.dhColorTextureWrapper.textureView, 
+			/*optionalClearColorAsInt*/ OptionalInt.empty(),
+			BlazeDhMetaRenderer.INSTANCE.dhDepthTextureWrapper.textureView, 
+			/*optionalDepthValueAsDouble*/ OptionalDouble.empty()))
+		{
+			// Bind instance data //
+			renderPass.setUniform("uniformBlock", this.uniformBuffer);
+
+			renderPass.setPipeline(this.pipeline);
+			renderPass.setIndexBuffer(this.boxIndexBuffer, VertexFormat.IndexType.INT);
+
+			renderPass.setVertexBuffer(0, this.boxVertexBuffer);
+
+			renderPass.drawIndexed(
+				/*indexStart*/ 0,
+				/*firstIndex*/0,
+				/*indexCount*/BOX_OUTLINE_INDICES.length,
+				/*instanceCount*/1);
+		}
 	}
 	private String getRenderPassName() { return "distantHorizons:McDebugRenderer"; }
 	
