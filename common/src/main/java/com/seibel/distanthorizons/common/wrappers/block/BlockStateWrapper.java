@@ -140,28 +140,8 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	//==============//
 	//region
 	
-	public static BlockStateWrapper fromBlockState(BlockState blockState, ILevelWrapper levelWrapper)
-	{
-		if (blockState == null || blockState.isAir())
-		{
-			return AIR;
-		}
-		
-		
-		if (WRAPPER_BY_BLOCK_STATE.containsKey(blockState))
-		{
-			return WRAPPER_BY_BLOCK_STATE.get(blockState);
-		}
-		else
-		{
-			BlockStateWrapper newWrapper = createNewWrapper(blockState, levelWrapper);
-			WRAPPER_BY_BLOCK_STATE.put(blockState, newWrapper);
-			return newWrapper;
-		}
-	}
-	
-	/** 
-	 * Can be faster than {@link BlockStateWrapper#fromBlockState(BlockState, ILevelWrapper)} 
+	/**
+	 * Can be faster than {@link BlockStateWrapper#fromBlockState(BlockState, ILevelWrapper)}
 	 * in cases where the same block state is expected to be referenced multiple times.
 	 */
 	public static BlockStateWrapper fromBlockState(BlockState blockState, ILevelWrapper levelWrapper, IBlockStateWrapper guess)
@@ -179,9 +159,14 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			return fromBlockState(blockState, levelWrapper);
 		}
 	}
-	
-	private static BlockStateWrapper createNewWrapper(@Nullable BlockState blockState, ILevelWrapper levelWrapper)
+	public static BlockStateWrapper fromBlockState(@Nullable BlockState blockState, ILevelWrapper levelWrapper)
 	{
+		// air is a special case
+		if (isAir(blockState))
+		{
+			return AIR;
+		}
+		
 		// create a wrapper specifically for the API event to use
 		BlockStateWrapper apiWrapper = new BlockStateWrapper(blockState, levelWrapper, null);
 		DhApiBlockStateWrapperCreatedEvent.EventParam eventParam = new DhApiBlockStateWrapperCreatedEvent.EventParam(apiWrapper);
@@ -197,212 +182,408 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		BlockStateWrapper returnWrapper = new BlockStateWrapper(blockState, levelWrapper, eventParam);
 		return returnWrapper;
 	}
-	private BlockStateWrapper(@Nullable BlockState blockState, ILevelWrapper levelWrapper, @Nullable DhApiBlockStateWrapperCreatedEvent.EventParam overrideEventParam)
+	private BlockStateWrapper(
+		@Nullable BlockState blockState, ILevelWrapper levelWrapper, 
+		@Nullable DhApiBlockStateWrapperCreatedEvent.EventParam overrideEventParam)
 	{
 		this.blockState = blockState;
-		this.serialString = this.serialize(levelWrapper);
+		this.serialString = serialize(blockState, levelWrapper);
 		this.hashCode = Objects.hash(this.serialString);
-		
-		// allow overriding if present
-		if (overrideEventParam != null 
-			&& overrideEventParam.getBlockMaterial() != null)
-		{
-			this.blockMaterialId = overrideEventParam.getBlockMaterial().index;
-		}
-		else
-		{
-			// no API override, use the base logic
-			this.blockMaterialId = this.calculateEDhApiBlockMaterialId().index;
-		}
-		
-		// allow overriding if present 
-		if (overrideEventParam != null 
-			&& overrideEventParam.getOpacity() != null)
-		{
-			this.opacity = overrideEventParam.getOpacity();
-		}
-		else
-		{
-			this.opacity = this.calculateOpacity();
-		}
-		
-		// allow overriding if present 
-		if (overrideEventParam != null 
-			&& overrideEventParam.getAllowApiColorOverride() != null)
-		{
-			this.allowApiColorOverride = overrideEventParam.getAllowApiColorOverride();
-		}
-		else
-		{
-			this.allowApiColorOverride = false;
-		}
-		
 		String lowerCaseSerial = this.serialString.toLowerCase();
 		
 		
 		
-		// beacon base blocks
-		#if MC_VER <= MC_1_18_2
-		
-		// Used to handle older MC versions that don't have an simple way of getting the block's tags
-		List<String> oldBeaconBaseBlockNameList = Arrays.asList(
-			"iron_block",
-			"gold_block",
-			"diamond_block",
-			"emerald_block",
-			"netherite_block"
-		);
-		
-		// Older MC versions are harder to get block tags, so just use a static list to determine beacon blocks
-		boolean isBeaconBaseBlock = false;
-		for (int i = 0; i < oldBeaconBaseBlockNameList.size(); i++)
+		// is liquid //
 		{
-			String baseBlockName = oldBeaconBaseBlockNameList.get(i);
-			if (lowerCaseSerial.contains(baseBlockName))
+			if (this.isAir()
+				|| this.blockState == null) // == null isn't necessary since its handled in isAir() but is here to prevent intellij from complaining
 			{
-				isBeaconBaseBlock = true;
-				break;
-			}
-		}
-		this.isBeaconBaseBlock = isBeaconBaseBlock;
-		#else
-		if (blockState != null)
-		{
-			// check if this block has any tags 
-			
-			Stream<TagKey<Block>> tags;
-			#if MC_VER <= MC_1_21_11
-			tags = blockState.getTags();
-			#else
-			tags = blockState.tags();
-			#endif
-			
-			this.isBeaconBaseBlock = tags.anyMatch((TagKey<Block> tag) -> tag.location().getPath().toLowerCase().contains("beacon_base_blocks"));
-		}
-		else
-		{
-			this.isBeaconBaseBlock = false;
-		}
-		#endif
-		
-		// beacon block
-		this.isBeaconBlock = lowerCaseSerial.contains("minecraft:beacon");
-		
-		
-		// beacon tint color
-		Color beaconTintColor = null;
-		if (this.blockState != null
-			// beacon blocks also show up here, but since they block the beacon beam we don't want their color		
-			&& !this.isBeaconBlock)
-		{
-			Block block = this.blockState.getBlock();
-			if (block instanceof BeaconBeamBlock)
-			{
-				int colorInt;
-				#if MC_VER <= MC_1_19_4
-				colorInt = ((BeaconBeamBlock) block).getColor().getMaterialColor().col;
-				#else 
-				colorInt = ((BeaconBeamBlock) block).getColor().getMapColor().col;
-				#endif
-				
-				beaconTintColor = ColorUtil.toColorObjRGB(colorInt);
-			}
-		}
-		this.beaconTintColor = beaconTintColor;
-		
-		
-		// allow/deny beacon beam passage 
-		boolean allowsBeaconBeamPassage;
-		if (this.blockState != null)
-		{
-			// get block properties (defaults to the values used by air)
-			boolean canOcclude = this.getCanOcclude();
-			boolean propagatesSkyLightDown = this.getPropagatesSkyLightDown();
-			
-			if (lowerCaseSerial.contains("minecraft:bedrock"))
-			{
-				// bedrock is a special case fully opaque block that does allow beacons through
-				allowsBeaconBeamPassage = true;
-			}
-			else if (lowerCaseSerial.contains("minecraft:tinted_glass"))
-			{
-				// tinted glass is a special case where it isn't fully opaque,
-				// but should block beacons
-				allowsBeaconBeamPassage = false;
-			}
-			else if (propagatesSkyLightDown || !canOcclude)
-			{
-				// stairs, cake, fences, etc.
-				allowsBeaconBeamPassage = true;
+				this.isLiquid = false;
 			}
 			else
 			{
-				// non-opaque blocks (glass, mob spawners, etc.)
-				// all allow beacons through
-				allowsBeaconBeamPassage = (this.opacity != LodUtil.BLOCK_FULLY_OPAQUE);
-			}
-		}
-		else
-		{
-			// air allows beacons through
-			allowsBeaconBeamPassage = true;
-		}
-		this.allowsBeaconBeamPassage = allowsBeaconBeamPassage;
-		
-		
-		// map color
-		if (this.blockState != null)
-		{
-			int mcColor = 0;
-			
-			#if MC_VER < MC_1_20_1
-			mcColor = this.blockState.getMaterial().getColor().col;
-	        #else
-			mcColor = this.blockState.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).col;
-            #endif
-			
-			this.mapColor = ColorUtil.toColorObjRGB(mcColor);
-		}
-		else
-		{
-			this.mapColor = new Color(0,0,0,0);
-		}
-		
-		
-		// is solid
-		if (this.isAir()
-			|| this.blockState == null) // "== null" isn't necessary since its handled in isAir() but is here to prevent intellij from complaining
-		{
-			this.isSolid = false;
-		}
-		else
-		{
-	        #if MC_VER < MC_1_20_1
-			this.isSolid = this.blockState.getMaterial().isSolid();
-	        #else
-			this.isSolid = !this.blockState.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
-            #endif
-		}
-		
-		// is liquid
-		if (this.isAir()
-			|| this.blockState == null) // == null isn't necessary since its handled in isAir() but is here to prevent intellij from complaining
-		{
-			this.isLiquid = false;
-		}
-		else
-		{
 	        #if MC_VER < MC_1_20_1
 			this.isLiquid = this.blockState.getMaterial().isLiquid() || !this.blockState.getFluidState().isEmpty();
 	        #else
-			this.isLiquid = !this.blockState.getFluidState().isEmpty();
+				this.isLiquid = !this.blockState.getFluidState().isEmpty();
 	        #endif
+			}
 		}
 		
+		
+		// API overriding //
+		{
+			if (overrideEventParam != null
+				&& overrideEventParam.getBlockMaterial() != null)
+			{
+				this.blockMaterialId = overrideEventParam.getBlockMaterial().index;
+			}
+			else
+			{
+				// no API override, use the base logic
+				this.blockMaterialId = calculateEDhApiBlockMaterialId(this.blockState, lowerCaseSerial, this.isLiquid).index;
+			}
+			
+			// allow overriding if present 
+			if (overrideEventParam != null
+				&& overrideEventParam.getOpacity() != null)
+			{
+				this.opacity = overrideEventParam.getOpacity();
+			}
+			else
+			{
+				this.opacity = calculateOpacity(this.blockState, isAir(this.blockState), this.isLiquid);
+			}
+			
+			// allow overriding if present 
+			if (overrideEventParam != null
+				&& overrideEventParam.getAllowApiColorOverride() != null)
+			{
+				this.allowApiColorOverride = overrideEventParam.getAllowApiColorOverride();
+			}
+			else
+			{
+				this.allowApiColorOverride = false;
+			}
+		}
+		
+		
+		// beacon handling //
+		{
+			
+			// beacon base blocks
+			#if MC_VER <= MC_1_18_2
+			
+			// Used to handle older MC versions that don't have an simple way of getting the block's tags
+			List<String> oldBeaconBaseBlockNameList = Arrays.asList(
+				"iron_block",
+				"gold_block",
+				"diamond_block",
+				"emerald_block",
+				"netherite_block"
+			);
+			
+			// Older MC versions are harder to get block tags, so just use a static list to determine beacon blocks
+			boolean isBeaconBaseBlock = false;
+			for (int i = 0; i < oldBeaconBaseBlockNameList.size(); i++)
+			{
+				String baseBlockName = oldBeaconBaseBlockNameList.get(i);
+				if (lowerCaseSerial.contains(baseBlockName))
+				{
+					isBeaconBaseBlock = true;
+					break;
+				}
+			}
+			this.isBeaconBaseBlock = isBeaconBaseBlock;
+			#else
+			if (blockState != null)
+			{
+				// check if this block has any tags 
+				
+				Stream<TagKey<Block>> tags;
+				#if MC_VER <= MC_1_21_11
+				tags = blockState.getTags();
+				#else
+				tags = blockState.tags();
+				#endif
+				
+				this.isBeaconBaseBlock = tags.anyMatch((TagKey<Block> tag) -> tag.location().getPath().toLowerCase().contains("beacon_base_blocks"));
+			}
+			else
+			{
+				this.isBeaconBaseBlock = false;
+			}
+			#endif
+			
+			// beacon block
+			this.isBeaconBlock = lowerCaseSerial.contains("minecraft:beacon");
+			
+			
+			// beacon tint color
+			Color beaconTintColor = null;
+			if (this.blockState != null
+				// beacon blocks also show up here, but since they block the beacon beam we don't want their color		
+				&& !this.isBeaconBlock)
+			{
+				Block block = this.blockState.getBlock();
+				if (block instanceof BeaconBeamBlock)
+				{
+					int colorInt;
+					#if MC_VER <= MC_1_19_4
+					colorInt = ((BeaconBeamBlock) block).getColor().getMaterialColor().col;
+					#else
+					colorInt = ((BeaconBeamBlock) block).getColor().getMapColor().col;
+					#endif
+					
+					beaconTintColor = ColorUtil.toColorObjRGB(colorInt);
+				}
+			}
+			this.beaconTintColor = beaconTintColor;
+			
+			
+			// allow/deny beacon beam passage 
+			boolean allowsBeaconBeamPassage;
+			if (this.blockState != null)
+			{
+				// get block properties (defaults to the values used by air)
+				boolean canOcclude = getCanOcclude(this.blockState);
+				boolean propagatesSkyLightDown = getPropagatesSkyLightDown(this.blockState);
+				
+				if (lowerCaseSerial.contains("minecraft:bedrock"))
+				{
+					// bedrock is a special case fully opaque block that does allow beacons through
+					allowsBeaconBeamPassage = true;
+				}
+				else if (lowerCaseSerial.contains("minecraft:tinted_glass"))
+				{
+					// tinted glass is a special case where it isn't fully opaque,
+					// but should block beacons
+					allowsBeaconBeamPassage = false;
+				}
+				else if (propagatesSkyLightDown || !canOcclude)
+				{
+					// stairs, cake, fences, etc.
+					allowsBeaconBeamPassage = true;
+				}
+				else
+				{
+					// non-opaque blocks (glass, mob spawners, etc.)
+					// all allow beacons through
+					allowsBeaconBeamPassage = (this.opacity != LodUtil.BLOCK_FULLY_OPAQUE);
+				}
+			}
+			else
+			{
+				// air allows beacons through
+				allowsBeaconBeamPassage = true;
+			}
+			this.allowsBeaconBeamPassage = allowsBeaconBeamPassage;
+		}
+		
+		
+		// map color //
+		{
+			if (this.blockState != null)
+			{
+				int mcColor = 0;
+			
+				#if MC_VER < MC_1_20_1
+				mcColor = this.blockState.getMaterial().getColor().col;
+		        #else
+				mcColor = this.blockState.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).col;
+                #endif
+				
+				this.mapColor = ColorUtil.toColorObjRGB(mcColor);
+			}
+			else
+			{
+				this.mapColor = new Color(0, 0, 0, 0);
+			}
+		}
+		
+		
+		// is solid //
+		{
+			if (this.isAir()
+				|| this.blockState == null) // "== null" isn't necessary since its handled in isAir() but is here to prevent IntelliJ from complaining
+			{
+				this.isSolid = false;
+			}
+			else
+			{
+	        #if MC_VER < MC_1_20_1
+			this.isSolid = this.blockState.getMaterial().isSolid();
+	        #else
+				this.isSolid = !this.blockState.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
+            #endif
+			}
+		}
 		
 		
 	}
 	
+	// static constructor helpers //
+	//region
+	
+	private static EDhApiBlockMaterial calculateEDhApiBlockMaterialId(
+		@Nullable BlockState blockState,
+		String lowercaseSerialString,
+		boolean isLiquid
+	)
+	{
+		if (blockState == null)
+		{
+			return EDhApiBlockMaterial.AIR;
+		}
+		
+		
+		if (blockState.is(BlockTags.LEAVES)
+			|| lowercaseSerialString.contains("bamboo")
+			|| lowercaseSerialString.contains("cactus")
+			|| lowercaseSerialString.contains("chorus_flower")
+			|| lowercaseSerialString.contains("mushroom")
+		)
+		{
+			return EDhApiBlockMaterial.LEAVES;
+		}
+		else if (blockState.is(Blocks.LAVA))
+		{
+			return EDhApiBlockMaterial.LAVA;
+		}
+		else if (isLiquid
+			|| blockState.is(Blocks.WATER))
+		{
+			return EDhApiBlockMaterial.WATER;
+		}
+		else if (blockState.getSoundType() == SoundType.WOOD
+			|| lowercaseSerialString.contains("root")
+				#if MC_VER >= MC_1_19_4
+			|| blockState.getSoundType() == SoundType.CHERRY_WOOD
+				#endif
+		)
+		{
+			return EDhApiBlockMaterial.WOOD;
+		}
+		else if (blockState.getSoundType() == SoundType.METAL
+				#if MC_VER >= MC_1_19_2
+				#endif
+			|| blockState.getSoundType() == SoundType.COPPER
+				#if MC_VER >= MC_1_20_4
+			|| blockState.getSoundType() == SoundType.COPPER_BULB
+			|| blockState.getSoundType() == SoundType.COPPER_GRATE
+				#endif
+		)
+		{
+			return EDhApiBlockMaterial.METAL;
+		}
+		else if (
+			lowercaseSerialString.contains("grass_block")
+				|| lowercaseSerialString.contains("grass_slab")
+		)
+		{
+			return EDhApiBlockMaterial.GRASS;
+		}
+		else if (
+			lowercaseSerialString.contains("dirt")
+				|| lowercaseSerialString.contains("gravel")
+				|| lowercaseSerialString.contains("mud")
+				|| lowercaseSerialString.contains("podzol")
+				|| lowercaseSerialString.contains("mycelium")
+		)
+		{
+			return EDhApiBlockMaterial.DIRT;
+		}
+		#if MC_VER >= MC_1_17_1
+		else if (blockState.getSoundType() == SoundType.DEEPSLATE
+			|| blockState.getSoundType() == SoundType.DEEPSLATE_BRICKS
+			|| blockState.getSoundType() == SoundType.DEEPSLATE_TILES
+			|| blockState.getSoundType() == SoundType.POLISHED_DEEPSLATE
+			|| lowercaseSerialString.contains("deepslate") )
+		{
+			return EDhApiBlockMaterial.DEEPSLATE;
+		} 
+		#endif
+		else if (lowercaseSerialString.contains("snow"))
+		{
+			return EDhApiBlockMaterial.SNOW;
+		}
+		else if (lowercaseSerialString.contains("sand"))
+		{
+			return EDhApiBlockMaterial.SAND;
+		}
+		else if (lowercaseSerialString.contains("terracotta"))
+		{
+			return EDhApiBlockMaterial.TERRACOTTA;
+		}
+		else if (blockState.is(BlockTags.BASE_STONE_NETHER))
+		{
+			return EDhApiBlockMaterial.NETHER_STONE;
+		}
+		else if (lowercaseSerialString.contains("stone")
+			|| lowercaseSerialString.contains("ore"))
+		{
+			return EDhApiBlockMaterial.STONE;
+		}
+		else if (blockState.getLightEmission() > 0)
+		{
+			return EDhApiBlockMaterial.ILLUMINATED;
+		}
+		else
+		{
+			return EDhApiBlockMaterial.UNKNOWN;
+		}
+	}
+	
+	private static int calculateOpacity(
+		@Nullable BlockState blockState,
+		boolean isAir, boolean isLiquid
+	)
+	{
+		// get block properties (defaults to the values used by air)
+		boolean canOcclude = getCanOcclude(blockState);
+		boolean propagatesSkyLightDown = getPropagatesSkyLightDown(blockState);
+		
+		
+		
+		// this method isn't perfect, but works well enough for our use case
+		int opacity;
+		if (isAir)
+		{
+			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
+		}
+		else if (isLiquid && !canOcclude)
+		{
+			// probably not a waterlogged block (which should block light entirely)
+			
+			// +1 to indicate that the block is translucent (in between transparent and opaque) 
+			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT + 1;
+		}
+		else if (propagatesSkyLightDown && !canOcclude)
+		{
+			// probably glass or some other fully transparent block
+			
+			// !canOcclude is required to ignore stairs and slabs since
+			// propagateSkyLightDown is true for them, but they're solid and don't actually let light through
+			
+			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
+		}
+		else
+		{
+			// default for all other blocks
+			opacity = LodUtil.BLOCK_FULLY_OPAQUE;
+		}
+		
+		
+		return opacity;
+	}
+	private static boolean getCanOcclude(@Nullable BlockState blockState)
+	{
+		// defaults to the value used by air
+		boolean canOcclude = false;
+		if (blockState != null)
+		{
+			canOcclude = blockState.canOcclude();
+		}
+		
+		return canOcclude;
+	}
+	private static boolean getPropagatesSkyLightDown(@Nullable BlockState blockState)
+	{
+		// defaults to the value used by air
+		boolean propagatesSkyLightDown = true;
+		if (blockState != null)
+		{
+			#if MC_VER < MC_1_21_3
+			propagatesSkyLightDown = blockState.propagatesSkylightDown(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+			#else
+			propagatesSkyLightDown = blockState.propagatesSkylightDown();
+			#endif
+		}
+		
+		return propagatesSkyLightDown;
+	}
+	
+	//endregion
 	//endregion
 	
 	
@@ -480,15 +661,6 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		return waterBlock;
 	}
 	
-	public static void clearCachedIgnoreBlocks() 
-	{
-		rendererIgnoredBlocks = null;
-		rendererIgnoredCaveBlocks = null;
-		waterSurfaceReplacementBlocks = null;
-		waterSubsurfaceReplacementBlocks = null;
-		waterBlock = null; 
-	}
-	
 	//endregion
 	
 	
@@ -545,7 +717,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 					List<BlockState> blockStatesToIgnore = defaultBlockStateToIgnore.blockState.getBlock().getStateDefinition().getPossibleStates();
 					for (BlockState blockState : blockStatesToIgnore)
 					{
-						BlockStateWrapper newBlockToIgnore = BlockStateWrapper.fromBlockState(blockState, levelWrapper);
+						BlockStateWrapper newBlockToIgnore = fromBlockState(blockState, levelWrapper);
 						blockStateWrappers.add(newBlockToIgnore);
 					}
 				}
@@ -568,6 +740,15 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		return blockStateWrappers;
 	}
 	
+	public static void clearCachedIgnoreBlocks()
+	{
+		rendererIgnoredBlocks = null;
+		rendererIgnoredCaveBlocks = null;
+		waterSurfaceReplacementBlocks = null;
+		waterSubsurfaceReplacementBlocks = null;
+		waterBlock = null;
+	}
+	
 	//endregion
 	
 	
@@ -579,73 +760,6 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	
 	@Override
 	public int getOpacity() { return this.opacity; }
-	private int calculateOpacity()
-	{
-		// get block properties (defaults to the values used by air)
-		boolean canOcclude = this.getCanOcclude();
-		boolean propagatesSkyLightDown = this.getPropagatesSkyLightDown();
-		
-		
-		
-		// this method isn't perfect, but works well enough for our use case
-		int opacity;
-		if (this.isAir())
-		{
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
-		}
-		else if (this.isLiquid() && !canOcclude)
-		{
-			// probably not a waterlogged block (which should block light entirely)
-			
-			// +1 to indicate that the block is translucent (in between transparent and opaque) 
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT + 1;
-		}
-		else if (propagatesSkyLightDown && !canOcclude)
-		{
-			// probably glass or some other fully transparent block
-			
-			// !canOcclude is required to ignore stairs and slabs since
-			// propagateSkyLightDown is true for them, but they're solid and don't actually let light through
-			
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
-		}
-		else
-		{
-			// default for all other blocks
-			opacity = LodUtil.BLOCK_FULLY_OPAQUE;
-		}
-		
-		
-		return opacity;
-	}
-	private boolean getCanOcclude()
-	{
-		// defaults to the value used by air
-		boolean canOcclude = false;
-		if (this.blockState != null)
-		{
-			canOcclude = this.blockState.canOcclude();
-		}
-		
-		return canOcclude;
-	}
-	private boolean getPropagatesSkyLightDown()
-	{
-		// defaults to the value used by air
-		boolean propagatesSkyLightDown = true;
-		if (this.blockState != null)
-		{
-			#if MC_VER < MC_1_21_3
-			propagatesSkyLightDown = this.blockState.propagatesSkylightDown(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
-			#else
-			propagatesSkyLightDown = this.blockState.propagatesSkylightDown();
-			#endif
-		}
-		
-		return propagatesSkyLightDown;
-	}
-	
-	
 	
 	@Override
 	public int getLightEmission() { return (this.blockState != null) ? this.blockState.getLightEmission() : 0; }
@@ -654,33 +768,11 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	public String getSerialString() { return this.serialString; }
 	
 	@Override
-	public boolean equals(Object obj)
-	{
-		if (this == obj)
-		{
-			return true;
-		}
-		
-		if (obj == null || this.getClass() != obj.getClass())
-		{
-			return false;
-		}
-		
-		BlockStateWrapper that = (BlockStateWrapper) obj;
-		// the serialized value is used so we can test the contents instead of the references
-		return Objects.equals(this.getSerialString(), that.getSerialString());
-	}
-	
-	@Override
-	public int hashCode() { return this.hashCode; } 
-	
-	
-	@Override
 	public Object getWrappedMcObject() { return this.blockState; }
 	
 	@Override
-	public boolean isAir() { return this.isAir(this.blockState); }
-	public boolean isAir(BlockState blockState) { return blockState == null || blockState.isAir(); }
+	public boolean isAir() { return isAir(this.blockState); }
+	public static boolean isAir(BlockState blockState) { return blockState == null || blockState.isAir(); }
 	
 	@Override
 	public boolean isSolid() { return this.isSolid; }
@@ -705,9 +797,6 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	@Override
 	public byte getMaterialId() { return this.blockMaterialId; }
 	
-	@Override
-	public String toString() { return this.getSerialString(); }
-	
 	//endregion
 	
 	
@@ -717,9 +806,9 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	//=======================//
 	//region
 	
-	private String serialize(ILevelWrapper levelWrapper)
+	private static String serialize(BlockState blockState, ILevelWrapper levelWrapper)
 	{
-		if (this.blockState == null)
+		if (blockState == null)
 		{
 			return AIR_STRING;
 		}
@@ -740,27 +829,26 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		#endif
 		
 		#if MC_VER <= MC_1_17_1
-		resourceLocation = Registry.BLOCK.getKey(this.blockState.getBlock());
+		resourceLocation = Registry.BLOCK.getKey(blockState.getBlock());
 		#elif MC_VER <= MC_1_19_2
-		resourceLocation = registryAccess.registryOrThrow(Registry.BLOCK_REGISTRY).getKey(this.blockState.getBlock());
+		resourceLocation = registryAccess.registryOrThrow(Registry.BLOCK_REGISTRY).getKey(blockState.getBlock());
 		#elif MC_VER <= MC_1_21_1
-		resourceLocation = registryAccess.registryOrThrow(Registries.BLOCK).getKey(this.blockState.getBlock());
+		resourceLocation = registryAccess.registryOrThrow(Registries.BLOCK).getKey(blockState.getBlock());
 		#else
-		resourceLocation = registryAccess.lookupOrThrow(Registries.BLOCK).getKey(this.blockState.getBlock());
+		resourceLocation = registryAccess.lookupOrThrow(Registries.BLOCK).getKey(blockState.getBlock());
 		#endif
 		
 		
 		
 		if (resourceLocation == null)
 		{
-			LOGGER.warn("No ResourceLocation found, unable to serialize: " + this.blockState);
+			LOGGER.warn("No ResourceLocation found, unable to serialize: " + blockState);
 			return AIR_STRING;
 		}
 		
-		this.serialString = resourceLocation.getNamespace() + RESOURCE_LOCATION_SEPARATOR + resourceLocation.getPath()
-				+ STATE_STRING_SEPARATOR + serializeBlockStateProperties(this.blockState);
-		
-		return this.serialString;
+		String serialString = resourceLocation.getNamespace() + RESOURCE_LOCATION_SEPARATOR + resourceLocation.getPath()
+				+ STATE_STRING_SEPARATOR + serializeBlockStateProperties(blockState);
+		return serialString;
 	}
 	
 	
@@ -899,7 +987,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 					foundState = block.defaultBlockState();
 				}
 				
-				foundWrapper = createNewWrapper(foundState, levelWrapper);
+				foundWrapper = fromBlockState(foundState, levelWrapper);
 				return foundWrapper;
 			}
 			catch (Exception e)
@@ -949,118 +1037,37 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	
 	
 	
-	//==============//
-	// Iris methods //
-	//==============//
+	//================//
+	// base overrides //
+	//================//
 	//region
 	
-	private EDhApiBlockMaterial calculateEDhApiBlockMaterialId() 
+	@Override
+	public boolean equals(Object obj)
 	{
-		if (this.blockState == null)
+		if (this == obj)
 		{
-			return EDhApiBlockMaterial.AIR;
+			return true;
 		}
 		
+		if (obj == null || this.getClass() != obj.getClass())
+		{
+			return false;
+		}
 		
-		String serialString = this.getSerialString().toLowerCase();
-		
-		if (this.blockState.is(BlockTags.LEAVES) 
-			|| serialString.contains("bamboo") 
-			|| serialString.contains("cactus")
-			|| serialString.contains("chorus_flower")
-			|| serialString.contains("mushroom")
-			) 
-		{
-			return EDhApiBlockMaterial.LEAVES;
-		}
-		else if (this.blockState.is(Blocks.LAVA))
-		{
-			return EDhApiBlockMaterial.LAVA;
-		}
-		else if (this.isLiquid() || this.blockState.is(Blocks.WATER))
-		{
-			return EDhApiBlockMaterial.WATER;
-		}
-		else if (this.blockState.getSoundType() == SoundType.WOOD
-				|| serialString.contains("root")
-				#if MC_VER >= MC_1_19_4
-				|| this.blockState.getSoundType() == SoundType.CHERRY_WOOD
-				#endif
-				) 
-		{
-			return EDhApiBlockMaterial.WOOD;
-		}
-		else if (this.blockState.getSoundType() == SoundType.METAL
-				#if MC_VER >= MC_1_19_2
-				|| this.blockState.getSoundType() == SoundType.COPPER
-				#endif
-				#if MC_VER >= MC_1_20_4
-				|| this.blockState.getSoundType() == SoundType.COPPER_BULB
-				|| this.blockState.getSoundType() == SoundType.COPPER_GRATE
-				#endif
-				) 
-		{
-			return EDhApiBlockMaterial.METAL;
-		}
-		else if (
-			serialString.contains("grass_block")
-			|| serialString.contains("grass_slab")
-			) 
-		{
-			return EDhApiBlockMaterial.GRASS;
-		}
-		else if (
-			serialString.contains("dirt")
-			|| serialString.contains("gravel")
-			|| serialString.contains("mud")
-			|| serialString.contains("podzol")
-			|| serialString.contains("mycelium")
-			)
-		{
-			return EDhApiBlockMaterial.DIRT;
-		}
-		#if MC_VER >= MC_1_17_1
-		else if (this.blockState.getSoundType() == SoundType.DEEPSLATE
-				|| this.blockState.getSoundType() == SoundType.DEEPSLATE_BRICKS
-				|| this.blockState.getSoundType() == SoundType.DEEPSLATE_TILES 
-				|| this.blockState.getSoundType() == SoundType.POLISHED_DEEPSLATE
-				|| serialString.contains("deepslate") ) 
-		{
-			return EDhApiBlockMaterial.DEEPSLATE;
-		} 
-		#endif
-		else if (this.serialString.contains("snow"))
-		{
-			return EDhApiBlockMaterial.SNOW;
-		} 
-		else if (serialString.contains("sand"))
-		{
-			return EDhApiBlockMaterial.SAND;
-		}
-		else if (serialString.contains("terracotta"))
-		{
-			return EDhApiBlockMaterial.TERRACOTTA;
-		} 
-		else if (this.blockState.is(BlockTags.BASE_STONE_NETHER)) 
-		{
-			return EDhApiBlockMaterial.NETHER_STONE;
-		} 
-		else if (serialString.contains("stone")
-				|| serialString.contains("ore")) 
-		{
-			return EDhApiBlockMaterial.STONE;
-		}
-		else if (this.blockState.getLightEmission() > 0) 
-		{
-			return EDhApiBlockMaterial.ILLUMINATED;
-		}
-		else
-		{
-			return EDhApiBlockMaterial.UNKNOWN;
-		}
+		BlockStateWrapper that = (BlockStateWrapper) obj;
+		// the serialized value is used so we can test the contents instead of the references
+		return Objects.equals(this.getSerialString(), that.getSerialString());
 	}
 	
+	@Override
+	public int hashCode() { return this.hashCode; }
+	
+	@Override
+	public String toString() { return this.getSerialString(); }
+	
 	//endregion
+	
 	
 	
 }
