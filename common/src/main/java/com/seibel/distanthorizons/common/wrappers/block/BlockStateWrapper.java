@@ -437,21 +437,21 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		}
 		else if (blockState.getSoundType() == SoundType.WOOD
 			|| lowercaseSerialString.contains("root")
-				#if MC_VER >= MC_1_19_4
+			#if MC_VER >= MC_1_19_4
 			|| blockState.getSoundType() == SoundType.CHERRY_WOOD
-				#endif
+			#endif
 		)
 		{
 			return EDhApiBlockMaterial.WOOD;
 		}
 		else if (blockState.getSoundType() == SoundType.METAL
-				#if MC_VER >= MC_1_19_2
-				#endif
+			#if MC_VER >= MC_1_19_2
 			|| blockState.getSoundType() == SoundType.COPPER
-				#if MC_VER >= MC_1_20_4
+			#endif
+			#if MC_VER >= MC_1_20_4
 			|| blockState.getSoundType() == SoundType.COPPER_BULB
 			|| blockState.getSoundType() == SoundType.COPPER_GRATE
-				#endif
+			#endif
 		)
 		{
 			return EDhApiBlockMaterial.METAL;
