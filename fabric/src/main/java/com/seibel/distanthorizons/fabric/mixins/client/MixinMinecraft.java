@@ -99,24 +99,7 @@ public abstract class MixinMinecraft
 	}
 	#endif
 	
-	// Level load/unload is handled via renderer-driven loading for Immersive Portals
-	// and via render hooks in MixinLevelRenderer. Avoid duplicating level
-	// load/unload logic here to keep a single, consistent system.
-	
 	@Inject(at = @At("HEAD"), method = "close()V")
 	public void close(CallbackInfo ci) { SelfUpdater.onClose(); }
-	
-	// Use a dedicated timer for cleanup instead of MC tick events
-	@Unique
-	private static final java.util.Timer CLIENT_CLEANUP_TIMER = com.seibel.distanthorizons.core.util.TimerUtil.CreateTimer("ClientLevelTickCleanup");
-
-	@Unique
-	private static final java.util.TimerTask CLIENT_CLEANUP_TASK = com.seibel.distanthorizons.core.util.TimerUtil.createTimerTask(() -> com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.tickCleanup());
-
-	static
-	{
-		// 20 ticks per second (50ms interval)
-		CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
-	}
 	
 }
