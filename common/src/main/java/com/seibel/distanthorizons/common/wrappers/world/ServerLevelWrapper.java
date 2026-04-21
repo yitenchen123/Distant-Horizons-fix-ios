@@ -247,8 +247,13 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		#else
 		
 		// directly hitting the chunkMap is required otherwise MC will run this on the main server thread,
+		#if MC_VER <= MC_1_21_11
+		var cPos = new ChunkPos(pos.getX(), pos.getZ()).toLong();
+		#else
+		var cPos = new ChunkPos(pos.getX(), pos.getZ()).pack();
+		#endif
 		// causing lag
-		ChunkHolder chunkHolder = this.level.getChunkSource().chunkMap.getVisibleChunkIfPresent(new ChunkPos(pos.getX(), pos.getZ()).toLong());
+		ChunkHolder chunkHolder = this.level.getChunkSource().chunkMap.getVisibleChunkIfPresent(cPos);
 		if (chunkHolder == null)
 		{
 			return null;

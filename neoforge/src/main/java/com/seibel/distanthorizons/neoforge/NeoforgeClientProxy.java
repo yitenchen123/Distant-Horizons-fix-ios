@@ -164,7 +164,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 				{
 					//LOGGER.trace("break or block attack at blockPos: " + event.getPos());
 					
-					LevelAccessor level = event.getLevel();
 					ChunkAccess chunk = level.getChunk(event.getPos());
 					this.onBlockChangeEvent(level, chunk);
 				});
@@ -174,7 +173,7 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 	private void onBlockChangeEvent(LevelAccessor level, ChunkAccess chunk)
 	{
 		ILevelWrapper wrappedLevel = ProxyUtil.getLevelWrapper(level);
-		SharedApi.INSTANCE.chunkBlockChangedEvent(new ChunkWrapper(chunk, wrappedLevel), wrappedLevel);
+		SharedApi.INSTANCE.applyChunkUpdate(new ChunkWrapper(chunk, wrappedLevel), wrappedLevel);
 	}
 	
 	
