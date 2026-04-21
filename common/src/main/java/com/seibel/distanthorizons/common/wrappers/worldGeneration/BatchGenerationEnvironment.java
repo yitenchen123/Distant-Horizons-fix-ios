@@ -154,22 +154,12 @@ public final class BatchGenerationEnvironment implements IBatchGeneratorEnvironm
 	
 	static
 	{
-		boolean isTerraFirmaCraftPresent = false;
-		try
-		{
-			Class.forName("net.dries007.tfc.world.TFCChunkGenerator");
-			isTerraFirmaCraftPresent = true;
-			LOGGER.info("TerraFirmaCraft detected.");
-		}
-		catch (ClassNotFoundException ignore) { }
-		
-		
 		ImmutableMap.Builder<EDhApiWorldGenerationStep, Integer> builder = ImmutableMap.builder();
 		builder.put(EDhApiWorldGenerationStep.EMPTY, 1);
 		builder.put(EDhApiWorldGenerationStep.STRUCTURE_START, 0);
 		builder.put(EDhApiWorldGenerationStep.STRUCTURE_REFERENCE, 0);
-		builder.put(EDhApiWorldGenerationStep.BIOMES, isTerraFirmaCraftPresent ? 1 : 0);
-		builder.put(EDhApiWorldGenerationStep.NOISE, isTerraFirmaCraftPresent ? 1 : 0);
+		builder.put(EDhApiWorldGenerationStep.BIOMES, 0);
+		builder.put(EDhApiWorldGenerationStep.NOISE, 0);
 		builder.put(EDhApiWorldGenerationStep.SURFACE, 0);
 		builder.put(EDhApiWorldGenerationStep.CARVERS, 0);
 		builder.put(EDhApiWorldGenerationStep.LIQUID_CARVERS, 0);
@@ -203,11 +193,6 @@ public final class BatchGenerationEnvironment implements IBatchGeneratorEnvironm
 			if (generator.getClass().toString().equals("class com.terraforged.mod.chunk.TFChunkGenerator"))
 			{
 				LOGGER.info("TerraForge Chunk Generator detected: [" + generator.getClass() + "], Distant Generation will try its best to support it.");
-				LOGGER.info("If it does crash, turn Distant Generation off or set it to to [" + EDhApiDistantGeneratorMode.PRE_EXISTING_ONLY + "].");
-			}
-			else if (generator.getClass().toString().equals("class net.dries007.tfc.world.TFCChunkGenerator"))
-			{
-				LOGGER.info("TerraFirmaCraft Chunk Generator detected: [" + generator.getClass() + "], Distant Generation will try its best to support it.");
 				LOGGER.info("If it does crash, turn Distant Generation off or set it to to [" + EDhApiDistantGeneratorMode.PRE_EXISTING_ONLY + "].");
 			}
 			else
