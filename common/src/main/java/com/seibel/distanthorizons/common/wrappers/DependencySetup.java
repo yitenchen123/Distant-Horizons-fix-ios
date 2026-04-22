@@ -80,9 +80,20 @@ public class DependencySetup
 		SingletonInjector.INSTANCE.bind(IConfigGui.class, ClassicConfigGUI.CONFIG_CORE_INTERFACE);
 	}
 	
+	private static boolean renderingApiBindingsSet = false;
 	/** will be called from a DH thread, not the render thread */
-	public static void setRenderingApiBindings()
+	public synchronized static void setRenderingApiBindings()
 	{
+		// shouldn't happen, but there was a single report that this method was triggered twice
+		if (renderingApiBindingsSet)
+		{
+			LOGGER.warn("Rendering bindings already set, skipping. How did this happen?");
+			return;
+		}
+		renderingApiBindingsSet = true;
+		
+		
+		
 		EDhApiRenderApi renderingApiEnum = Config.Client.Advanced.Graphics.Experimental.renderingApi.get();
 		if (renderingApiEnum == EDhApiRenderApi.AUTO)
 		{
