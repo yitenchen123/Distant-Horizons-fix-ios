@@ -40,8 +40,6 @@ public final class ThreadWorldGenParams
 	public StructureCheck structCheck;
 	#endif
 	
-	boolean isValid = true;
-	
 	// used for some older MC versions
 	private static GlobalWorldGenParams previousGlobalWorldGenParams = null;
 	
@@ -55,7 +53,6 @@ public final class ThreadWorldGenParams
 	{
 		ThreadWorldGenParams threadParam = LOCAL_PARAM_REF.get();
 		if (threadParam != null
-			&& threadParam.isValid 
 			&& threadParam.level == globalParams.mcServerLevel)
 		{
 			return threadParam;
