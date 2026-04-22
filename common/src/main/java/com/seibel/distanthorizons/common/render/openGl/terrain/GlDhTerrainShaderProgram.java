@@ -311,6 +311,12 @@ public class GlDhTerrainShaderProgram extends GlShaderProgram implements IDhApiS
 			for (int lodIndex = 0; lodIndex < bufferContainers.size(); lodIndex++)
 			{
 				LodBufferContainer bufferContainer = bufferContainers.get(lodIndex);
+				if (!bufferContainer.buffersUploaded)
+				{
+					// make sure we don't accidentally try
+					// rendering a buffer that is (or is going to be) freed 
+					continue;
+				}
 				
 				// set uniforms and fire events
 				{
