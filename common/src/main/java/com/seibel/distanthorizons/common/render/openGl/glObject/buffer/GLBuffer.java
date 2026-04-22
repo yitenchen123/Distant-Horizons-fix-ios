@@ -62,14 +62,13 @@ public class GLBuffer implements AutoCloseable
 	private static final ThreadPoolExecutor CLEANUP_THREAD = ThreadUtil.makeSingleDaemonThreadPool("GLBuffer Cleanup");
 	
 	
-	protected int id;
+	protected int id = 0;
 	public final int getId() { return this.id; }
 	protected int size = 0;
 	public int getSize() { return this.size; }
 	protected boolean bufferStorage;
 	protected boolean isMapped = false;
 	
-	public final StampedLock writeLock = new StampedLock();
 	
 	
 	//==============//
@@ -112,27 +111,26 @@ public class GLBuffer implements AutoCloseable
 			LodUtil.assertNotReach("Thread ["+Thread.currentThread()+"] tried to create a GLBuffer outside the MC render thread.");
 		}
 		
-		// destroy the old buffer if one is present
-		if (this.id != 0)
+		
+		int oldId = this.id;
+		this.id = GLMC.glGenBuffers();
+		
+		// destroy the old buffer
+		// after the new one has been created 
+		// to hopefully prevent a rare race conditions where the old ID
+		// is still used somewhere
+		if (oldId != 0)
 		{
-			destroyBufferIdNow(this.id);
+			destroyBufferIdNow(oldId);
 		}
 		
-		long writeLock = this.writeLock.writeLock();
-		try
-		{
-			this.id = GLMC.glGenBuffers();
-			this.bufferStorage = asBufferStorage;
-			bufferCount.getAndIncrement();
-			
-			PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
-			PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
-			BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
-		}
-		finally
-		{
-			this.writeLock.unlock(writeLock);
-		}
+		
+		this.bufferStorage = asBufferStorage;
+		bufferCount.getAndIncrement();
+		
+		PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
+		PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
+		BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
 		
 	}
 	
@@ -144,20 +142,14 @@ public class GLBuffer implements AutoCloseable
 			return;
 		}
 		
-		long writeLock = this.writeLock.writeLock();
-		try
-		{
-			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
-			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
-			
-			this.id = 0;
-			this.size = 0;
-		}
-		finally
-		{
-			this.writeLock.unlock(writeLock);
-		}
+		final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
 		
+		// mark the old data is invalid before deleting to prevent a rare race condition
+		// where the queued on render thread task runs before the ID is cleared
+		this.id = 0;
+		this.size = 0;
+		
+		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
 	}
 	private static void destroyBufferIdNow(int id)
 	{

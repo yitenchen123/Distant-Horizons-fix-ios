@@ -341,46 +341,33 @@ public class GlDhTerrainShaderProgram extends GlShaderProgram implements IDhApiS
 						continue;
 					}
 					
-					
-					long vboReadLock = vbo.writeLock.tryReadLock();
-					if (vboReadLock == 0)
+					// don't render empty sections
+					if (vbo.getVertexCount() == 0)
 					{
-						// VBO is being deleted
 						continue;
 					}
 					
-					try
+					// don't render deleted VBOs (this will crash the driver/game)
+					if (vbo.getId() == 0
+						|| vbo.getQuadIBO().getId() == 0)
 					{
-						if (vbo.getVertexCount() == 0)
-						{
-							continue;
-						}
-						
-						if (vbo.getId() == 0
-							|| vbo.getQuadIBO().getId() == 0)
-						{
-							continue;
-						}
-						
-						// 4 vertices per face, but 6 indices (IE 2 triangles) per face, aka need to multiply by 1.5
-						int indexCount = (int)(vbo.getVertexCount() * 1.5);
-						
-						vbo.bind();
-						vbo.getQuadIBO().bind();
-						
-						GlDhMetaRenderer.INSTANCE.shaderProgramForThisFrame.bindVertexBuffer(vbo.getId());
-						GL32.glDrawElements(
-							GL32.GL_TRIANGLES,
-							indexCount,
-							vbo.getQuadIBO().getGlType(), 0);
-						
-						vbo.unbind();
-						vbo.getQuadIBO().unbind();
+						continue;
 					}
-					finally
-					{
-						vbo.writeLock.unlock(vboReadLock);
-					}
+					
+					// 4 vertices per face, but 6 indices (IE 2 triangles) per face, aka need to multiply by 1.5
+					int indexCount = (int)(vbo.getVertexCount() * 1.5);
+					
+					vbo.bind();
+					vbo.getQuadIBO().bind();
+					
+					GlDhMetaRenderer.INSTANCE.shaderProgramForThisFrame.bindVertexBuffer(vbo.getId());
+					GL32.glDrawElements(
+						GL32.GL_TRIANGLES,
+						indexCount,
+						vbo.getQuadIBO().getGlType(), 0);
+					
+					vbo.unbind();
+					vbo.getQuadIBO().unbind();
 				}
 			}
 		}
