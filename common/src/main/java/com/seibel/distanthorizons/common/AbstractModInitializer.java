@@ -8,8 +8,8 @@ import com.seibel.distanthorizons.common.commands.CommandInitializer;
 import com.seibel.distanthorizons.common.wrappers.DependencySetup;
 import com.seibel.distanthorizons.common.wrappers.gui.DhDebugScreenEntry;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftServerWrapper;
+import com.seibel.distanthorizons.core.Initializer;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.config.eventHandlers.presets.ThreadPresetConfigEventHandler;
@@ -95,7 +95,8 @@ public abstract class AbstractModInitializer
 		
 		// Client uses config for auto-updater, so it's initialized here instead of post-init stage
 		this.initConfig();
-		logModIncompatibilityWarnings(); // needs to be called after config loading
+		logIncompatibilityWarnings(); // needs to be called after config loading
+		Initializer.postConfigInit();
 		
 		LOGGER.info(ModInfo.READABLE_NAME + " client Initialized.");
 		
@@ -137,6 +138,7 @@ public abstract class AbstractModInitializer
 			MinecraftServerWrapper.INSTANCE.dedicatedServer = (DedicatedServer)server;
 			
 			this.initConfig();
+			Initializer.postConfigInit();
 			this.postInit();
 			this.postServerInit();
 			this.commandInitializer.onServerReady();
@@ -159,7 +161,7 @@ public abstract class AbstractModInitializer
 	private void startup()
 	{
 		DependencySetup.createSharedBindings();
-		SharedApi.init();
+		Initializer.preConfigInit();
 		this.createInitialSharedBindings();
 	}
 	
@@ -261,9 +263,9 @@ public abstract class AbstractModInitializer
 	
 	
 	
-	//==================================//
-	// mod partial compatibility checks //
-	//==================================//
+	//======================//
+	// compatibility checks //
+	//======================//
 	//region
 	
 	/** 
@@ -272,7 +274,7 @@ public abstract class AbstractModInitializer
 	 * This method will log (and display to chat if enabled)
 	 * these warnings and potential fixes.
 	 */
-	private static void logModIncompatibilityWarnings()
+	private static void logIncompatibilityWarnings()
 	{
 		boolean showChatWarnings = Config.Common.Logging.Warning.showModCompatibilityWarningsOnStartup.get();
 		IModChecker modChecker = SingletonInjector.INSTANCE.get(IModChecker.class);
