@@ -21,7 +21,6 @@ package com.seibel.distanthorizons.common.render.openGl.glObject.buffer;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.common.render.openGl.glObject.GLProxy;
-import com.seibel.distanthorizons.common.render.openGl.glObject.GLState;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftGLWrapper;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -39,6 +38,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.StampedLock;
 
 public class GLBuffer implements AutoCloseable
 {
@@ -67,9 +67,9 @@ public class GLBuffer implements AutoCloseable
 	protected int size = 0;
 	public int getSize() { return this.size; }
 	protected boolean bufferStorage;
-	public final boolean isBufferStorage() { return this.bufferStorage; }
 	protected boolean isMapped = false;
 	
+	public final StampedLock writeLock = new StampedLock();
 	
 	
 	//==============//
@@ -118,13 +118,21 @@ public class GLBuffer implements AutoCloseable
 			destroyBufferIdNow(this.id);
 		}
 		
-		this.id = GLMC.glGenBuffers();
-		this.bufferStorage = asBufferStorage;
-		bufferCount.getAndIncrement();
-		
-		PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
-		PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
-		BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
+		long writeLock = this.writeLock.writeLock();
+		try
+		{
+			this.id = GLMC.glGenBuffers();
+			this.bufferStorage = asBufferStorage;
+			bufferCount.getAndIncrement();
+			
+			PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
+			PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
+			BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
+		}
+		finally
+		{
+			this.writeLock.unlock(writeLock);
+		}
 		
 	}
 	
@@ -136,11 +144,20 @@ public class GLBuffer implements AutoCloseable
 			return;
 		}
 		
-		final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
-		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
+		long writeLock = this.writeLock.writeLock();
+		try
+		{
+			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
+			
+			this.id = 0;
+			this.size = 0;
+		}
+		finally
+		{
+			this.writeLock.unlock(writeLock);
+		}
 		
-		this.id = 0;
-		this.size = 0;
 	}
 	private static void destroyBufferIdNow(int id)
 	{
