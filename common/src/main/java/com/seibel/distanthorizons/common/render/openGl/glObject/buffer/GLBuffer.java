@@ -156,18 +156,17 @@ public class GLBuffer implements AutoCloseable
 	
 	protected void destroyAsync()
 	{
-		if (this.id == 0)
-		{
-			// the buffer has already been closed
-			return;
-		}
-		
-		
 		// lock to prevent the render thread from accessing the buffer's ID
 		// while we are removing it
 		long writeStamp = renderStampLock.writeLock();
 		try
 		{
+			if (this.id == 0)
+			{
+				// the buffer has already been closed
+				return;
+			}
+			
 			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
 			
 			// mark the old data is invalid before deleting to prevent a rare race condition
