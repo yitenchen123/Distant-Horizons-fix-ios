@@ -75,8 +75,10 @@ import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapp
 import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IImmersivePortalsAccessor;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -176,7 +178,7 @@ public class MixinLevelRenderer
 		    ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
 		    
 		    // Apply Immersive Portals compatibility only when IP is detected
-		    if (com.seibel.distanthorizons.common.ImmersivePortalsCompat.isImmersivePortalsActive())
+		    if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
 		    {
 			    if (!wrapper.isDhLevelLoaded())
 			    {

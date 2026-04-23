@@ -244,7 +244,7 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
 		{
 			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
 			{
 				if (!wrapper.isDhLevelLoaded())
 				{
@@ -274,7 +274,7 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
 		{
 			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
 			{
 				if (!wrapper.isDhLevelLoaded())
 				{
@@ -301,7 +301,7 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
 		{
 			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ImmersivePortalsCompat.isImmersivePortalsActive())
+			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
 			{
 				if (!wrapper.isDhLevelLoaded())
 				{
