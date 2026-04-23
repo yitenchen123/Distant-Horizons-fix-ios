@@ -289,6 +289,9 @@ public class GlDhTerrainShaderProgram extends GlShaderProgram implements IDhApiS
 			GLMC.disableBlend();
 		}
 		
+		// needs to be triggered after DH attempts to set the GL state so that Iris 
+		// can override it as needed
+		ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderPassEvent.class, renderEventParam);
 		
 		
 		
