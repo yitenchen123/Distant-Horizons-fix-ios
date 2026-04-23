@@ -62,7 +62,7 @@ public class GLBuffer implements AutoCloseable
 	private static final ThreadPoolExecutor CLEANUP_THREAD = ThreadUtil.makeSingleDaemonThreadPool("GLBuffer Cleanup");
 	
 	
-	protected int id = 0;
+	protected volatile int id = 0;
 	public final int getId() { return this.id; }
 	protected int size = 0;
 	public int getSize() { return this.size; }
@@ -123,26 +123,35 @@ public class GLBuffer implements AutoCloseable
 		}
 		
 		
-		int oldId = this.id;
-		this.id = GLMC.glGenBuffers();
-		
-		// destroy the old buffer
-		// after the new one has been created 
-		// to hopefully prevent a rare race conditions where the old ID
-		// is still used somewhere
-		if (oldId != 0)
+		// lock to prevent the render thread from accessing the buffer's ID
+		// while we are removing it
+		long writeStamp = renderStampLock.writeLock();
+		try
 		{
-			destroyBufferIdNow(oldId);
+			int oldId = this.id;
+			this.id = GLMC.glGenBuffers();
+			
+			// destroy the old buffer
+			// after the new one has been created 
+			// to hopefully prevent a rare race conditions where the old ID
+			// is still used somewhere
+			if (oldId != 0)
+			{
+				destroyBufferIdNow(oldId);
+			}
+			
+			
+			this.bufferStorage = asBufferStorage;
+			bufferCount.getAndIncrement();
+			
+			PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
+			PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
+			BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
 		}
-		
-		
-		this.bufferStorage = asBufferStorage;
-		bufferCount.getAndIncrement();
-		
-		PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
-		PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
-		BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
-		
+		finally
+		{
+			renderStampLock.unlock(writeStamp);
+		}
 	}
 	
 	protected void destroyAsync()
@@ -154,13 +163,11 @@ public class GLBuffer implements AutoCloseable
 		}
 		
 		
-		long writeStamp = 0;
+		// lock to prevent the render thread from accessing the buffer's ID
+		// while we are removing it
+		long writeStamp = renderStampLock.writeLock();
 		try
 		{
-			// lock to prevent the render thread from accessing the buffer's ID
-			// while we are removing it
-			writeStamp = renderStampLock.writeLock();
-			
 			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
 			
 			// mark the old data is invalid before deleting to prevent a rare race condition
@@ -354,7 +361,6 @@ public class GLBuffer implements AutoCloseable
 		{
 			// recreate if the buffer storage type changed
 			this.bind();
-			destroyBufferIdNow(this.id);
 			this.destroyOldAndCreate(uploadMethod.useBufferStorage);
 			this.bind();
 		}
