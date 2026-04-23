@@ -137,6 +137,8 @@ public class GLBuffer implements AutoCloseable
 			// is still used somewhere
 			if (oldId != 0)
 			{
+				// this ID doesn't need to be tracked anymore
+				tryRemoveBufferIdFromPhantom(oldId);
 				destroyBufferIdNow(oldId);
 			}
 			
@@ -169,6 +171,11 @@ public class GLBuffer implements AutoCloseable
 			
 			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
 			
+			// remove the phantom tracking now so the phantom doesn't have the chance to
+			// get garbage collected before the render thread task runs
+			// (this can happen if MC is running at extremely low framerates like 1 fps via mods)
+			tryRemoveBufferIdFromPhantom(idToDelete);
+			
 			// mark the old data is invalid before deleting to prevent a rare race condition
 			// where the queued on render thread task runs before the ID is cleared
 			this.id = 0;
@@ -181,6 +188,7 @@ public class GLBuffer implements AutoCloseable
 			renderStampLock.unlock(writeStamp);
 		}
 	}
+	
 	private static void destroyBufferIdNow(int id)
 	{
 		// only delete valid buffers
@@ -188,20 +196,6 @@ public class GLBuffer implements AutoCloseable
 		{
 			LOGGER.warn("Attempted to destroy a buffer with ID 0, VRAM memory leaks may occur.");
 			return;
-		}
-		
-		// remove and clear the phantom reference if present
-		if (BUFFER_ID_TO_PHANTOM.containsKey(id))
-		{
-			Reference<? extends GLBuffer> phantom = BUFFER_ID_TO_PHANTOM.get(id);
-			
-			// if we are manually closing this buffer, we don't want the phantom reference to accidentally close it again
-			// this can cause a race condition were we accidentally delete an in-use buffer and cause NVIDIA
-			// to throw an EXCEPTION_ACCESS_VIOLATION when we attempt to render it
-			phantom.clear();
-			
-			PHANTOM_TO_BUFFER_ID.remove(phantom);
-			BUFFER_ID_TO_PHANTOM.remove(id);
 		}
 		
 		bufferCount.decrementAndGet();
@@ -216,6 +210,32 @@ public class GLBuffer implements AutoCloseable
 			{
 				LOGGER.info("destroyed buffer [" + id + "], remaining: [" + BUFFER_ID_TO_PHANTOM.size() + "]");
 			}
+		}
+		else
+		{
+			// shouldn't happen, but just in case
+			LOGGER.warn("Attempted to destroy a non buffer object with ID ["+id+"].");
+		}
+	}
+	
+	/** should be called before {@link GLBuffer#destroyBufferIdNow} */
+	private static void tryRemoveBufferIdFromPhantom(int id)
+	{
+		if (BUFFER_ID_TO_PHANTOM.containsKey(id))
+		{
+			Reference<? extends GLBuffer> phantom = BUFFER_ID_TO_PHANTOM.get(id);
+			
+			// if we are manually closing this buffer, we don't want the phantom reference to accidentally close it again
+			// this can cause a race condition were we accidentally delete an in-use buffer and cause NVIDIA
+			// to throw an EXCEPTION_ACCESS_VIOLATION when we attempt to render it
+			phantom.clear();
+			
+			PHANTOM_TO_BUFFER_ID.remove(phantom);
+			BUFFER_ID_TO_PHANTOM.remove(id);
+		}
+		else
+		{
+			LOGGER.warn("Unable to remove phantom GLBuffer with ID ["+id+"], buffer may have already been deleted.");
 		}
 	}
 	
