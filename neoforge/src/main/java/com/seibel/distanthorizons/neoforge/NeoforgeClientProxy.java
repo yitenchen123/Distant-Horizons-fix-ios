@@ -94,21 +94,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel, true);
 		ClientApi.INSTANCE.clientLevelLoadEvent(clientLevelWrapper);
 	}
-	@SubscribeEvent
-	public void clientLevelUnloadEvent(LevelEvent.Unload event)
-	{
-		LOGGER.info("level unload");
-		
-		LevelAccessor level = event.getLevel();
-		if (!(level instanceof ClientLevel))
-		{
-			return;
-		}
-		
-		ClientLevel clientLevel = (ClientLevel) level;
-		IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel);
-		ClientApi.INSTANCE.clientLevelUnloadEvent(clientLevelWrapper);
-	}
 	
 	
 	
@@ -241,21 +226,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		// handled via the same mixin as fabric for consistency
 		#endif
 		
-		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
-		{
-			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
-			{
-				if (!wrapper.isDhLevelLoaded())
-				{
-					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
-					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
-				}
-			}
-			
-			wrapper.markRendered();
-		}
-		
 		ClientApi.INSTANCE.renderFadeOpaque();
 	}
 	
@@ -270,21 +240,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		#else
 		// handled via the same mixin as fabric for consistency
 		#endif
-
-		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
-		{
-			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
-			{
-				if (!wrapper.isDhLevelLoaded())
-				{
-					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
-					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
-				}
-			}
-
-			wrapper.markRendered();
-		}
 	}
 	
 	@SubscribeEvent
@@ -297,21 +252,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 		#else
 		// handled via the same mixin as fabric for consistency
 		#endif
-
-		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
-		{
-			ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-			if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
-			{
-				if (!wrapper.isDhLevelLoaded())
-				{
-					LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
-					ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
-				}
-			}
-
-			wrapper.markRendered();
-		}
 
 		try
 		{

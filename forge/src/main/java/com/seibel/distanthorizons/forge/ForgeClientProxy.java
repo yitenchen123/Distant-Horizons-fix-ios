@@ -134,29 +134,6 @@ public class ForgeClientProxy implements AbstractModInitializer.IEventProxy
 		IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel, true);
 		ClientApi.INSTANCE.clientLevelLoadEvent(clientLevelWrapper);
 	}
-	@SubscribeEvent
-	#if MC_VER < MC_1_19_2
-	public void clientLevelUnloadEvent(WorldEvent.Unload event)
-	#else
-	public void clientLevelUnloadEvent(LevelEvent.Unload event)
-	#endif
-	{
-		LOGGER.info("level unload");
-		
-		#if MC_VER < MC_1_19_2
-		LevelAccessor level = event.getWorld();
-		#else
-		LevelAccessor level = event.getLevel();
-		#endif
-		if (!(level instanceof ClientLevel))
-		{
-			return;
-		}
-		
-		ClientLevel clientLevel = (ClientLevel) level;
-		IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel);
-		ClientApi.INSTANCE.clientLevelUnloadEvent(clientLevelWrapper);
-	}
 	
 	
 	

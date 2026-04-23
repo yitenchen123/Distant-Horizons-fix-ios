@@ -27,7 +27,6 @@ import com.mojang.math.Matrix4f;
 import org.lwjgl.opengl.GL32;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 #elif MC_VER < MC_1_21_6
-import com.seibel.distanthorizons.core.util.math.Mat4f;
 import net.minecraft.client.renderer.RenderType;
 import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Matrix4f;
@@ -75,10 +74,7 @@ import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapp
 import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
-import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IImmersivePortalsAccessor;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -172,25 +168,6 @@ public class MixinLevelRenderer
 		
 		ClientApi.RENDER_STATE.partialTickTime = MinecraftRenderWrapper.INSTANCE.getPartialTickTime();
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
-	    
-	    if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
-	    {
-		    ClientLevelWrapper wrapper = (ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper;
-		    
-		    // Apply Immersive Portals compatibility only when IP is detected
-		    if (ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class) != null)
-		    {
-			    if (!wrapper.isDhLevelLoaded())
-			    {
-				    LOGGER.debug("IP detected - On-demand loading level " + wrapper.getDhIdentifier() + " during rendering");
-				    ClientApi.INSTANCE.clientLevelLoadEvent(wrapper);
-			    }
-		    }
-		    
-		    wrapper.markRendered();
-	    }
-	    
-	    
 	    
 	    #if MC_VER < MC_1_21_6
 	    if (renderType.equals(RenderType.translucent())) 

@@ -27,6 +27,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSende
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.*;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 
+import com.seibel.distanthorizons.forge.wrappers.modAccessor.ImmersivePortalsAccessorForge;
 import com.seibel.distanthorizons.forge.wrappers.modAccessor.ModChecker;
 import com.seibel.distanthorizons.forge.wrappers.modAccessor.OptifineAccessor;
 import com.seibel.distanthorizons.forge.wrappers.modAccessor.OculusAccessor;
@@ -102,7 +103,7 @@ public class ForgeMain extends AbstractModInitializer
 	{
 		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
 		this.tryCreateModCompatAccessor("oculus", IIrisAccessor.class, OculusAccessor::new);
-		this.tryCreateModCompatAccessor("imm_ptl_core", IImmersivePortalsAccessor.class, ImmersivePortalsAccessor::new);
+		this.tryCreateModCompatAccessor("imm_ptl_core", IImmersivePortalsAccessor.class, ImmersivePortalsAccessorForge::new);
 		
 		#if MC_VER < MC_1_17_1
 		ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,

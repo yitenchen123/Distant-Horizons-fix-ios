@@ -102,6 +102,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	//==================//
 	//region
 	
+	@Override
 	public synchronized void markRendered() {
 		this.lastRenderTime = System.currentTimeMillis();
 	}
@@ -155,6 +156,9 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 				{
 					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
 					ClientApi.INSTANCE.clientLevelUnloadEvent(wrapper);
+					if (wrapper.isDhLevelLoaded()) {
+						wrapper.onUnload();
+					}
 				}
 			}
 		}
