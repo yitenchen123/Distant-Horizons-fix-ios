@@ -341,33 +341,45 @@ public class GlDhTerrainShaderProgram extends GlShaderProgram implements IDhApiS
 						continue;
 					}
 					
-					// don't render empty sections
-					if (vbo.getVertexCount() == 0)
+					
+					// for lock information please view the lock's javadocs
+					long vboReadStamp = vbo.renderStampLock.readLock();
+					long iboReadStamp = vbo.getQuadIBO().renderStampLock.readLock();
+					try
 					{
-						continue;
+						// don't render empty sections
+						if (vbo.getVertexCount() == 0)
+						{
+							continue;
+						}
+						
+						// don't render deleted VBOs (this will crash the driver/game)
+						if (vbo.getId() == 0
+							|| vbo.getQuadIBO().getId() == 0)
+						{
+							continue;
+						}
+						
+						// 4 vertices per face, but 6 indices (IE 2 triangles) per face, aka need to multiply by 1.5
+						int indexCount = (int) (vbo.getVertexCount() * 1.5);
+						
+						vbo.bind();
+						vbo.getQuadIBO().bind();
+						
+						GlDhMetaRenderer.INSTANCE.shaderProgramForThisFrame.bindVertexBuffer(vbo.getId());
+						GL32.glDrawElements(
+							GL32.GL_TRIANGLES,
+							indexCount,
+							vbo.getQuadIBO().getGlType(), 0);
+						
+						vbo.unbind();
+						vbo.getQuadIBO().unbind();
 					}
-					
-					// don't render deleted VBOs (this will crash the driver/game)
-					if (vbo.getId() == 0
-						|| vbo.getQuadIBO().getId() == 0)
+					finally
 					{
-						continue;
+						vbo.renderStampLock.unlock(vboReadStamp);
+						vbo.getQuadIBO().renderStampLock.unlock(iboReadStamp);
 					}
-					
-					// 4 vertices per face, but 6 indices (IE 2 triangles) per face, aka need to multiply by 1.5
-					int indexCount = (int)(vbo.getVertexCount() * 1.5);
-					
-					vbo.bind();
-					vbo.getQuadIBO().bind();
-					
-					GlDhMetaRenderer.INSTANCE.shaderProgramForThisFrame.bindVertexBuffer(vbo.getId());
-					GL32.glDrawElements(
-						GL32.GL_TRIANGLES,
-						indexCount,
-						vbo.getQuadIBO().getGlType(), 0);
-					
-					vbo.unbind();
-					vbo.getQuadIBO().unbind();
 				}
 			}
 		}

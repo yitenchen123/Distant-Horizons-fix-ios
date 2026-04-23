@@ -69,6 +69,17 @@ public class GLBuffer implements AutoCloseable
 	protected boolean bufferStorage;
 	protected boolean isMapped = false;
 	
+	/**
+	 * Locking on the render thread isn't great, but is needed due to an inconsistent
+	 * race condition where VBOs can be marked as deleted outside the render thread. <br><br>
+	 * 
+	 * But, due to being a read-write lock the chance of freezing
+	 * the render thread is very low
+	 * and since this is a stamped lock, the optimistic read time is basically zero.
+	 * (The optimistic lock time doesn't even appear in the profiler).
+	 */
+	public final StampedLock renderStampLock = new StampedLock();
+	
 	
 	
 	//==============//
@@ -142,14 +153,27 @@ public class GLBuffer implements AutoCloseable
 			return;
 		}
 		
-		final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
 		
-		// mark the old data is invalid before deleting to prevent a rare race condition
-		// where the queued on render thread task runs before the ID is cleared
-		this.id = 0;
-		this.size = 0;
-		
-		RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
+		long writeStamp = 0;
+		try
+		{
+			// lock to prevent the render thread from accessing the buffer's ID
+			// while we are removing it
+			writeStamp = renderStampLock.writeLock();
+			
+			final int idToDelete = this.id; // saving the ID to a separate variable is necessary so it can be captured by the lambda
+			
+			// mark the old data is invalid before deleting to prevent a rare race condition
+			// where the queued on render thread task runs before the ID is cleared
+			this.id = 0;
+			this.size = 0;
+			
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
+		}
+		finally
+		{
+			renderStampLock.unlock(writeStamp);
+		}
 	}
 	private static void destroyBufferIdNow(int id)
 	{
