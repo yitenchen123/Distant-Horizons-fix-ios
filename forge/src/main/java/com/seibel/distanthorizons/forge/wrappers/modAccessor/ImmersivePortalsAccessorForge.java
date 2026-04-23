@@ -1,47 +1,19 @@
 package com.seibel.distanthorizons.forge.wrappers.modAccessor;
 
-import com.google.common.base.Suppliers;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ImmersivePortalsAbstractAccessor;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import com.seibel.distanthorizons.common.wrappers.modAccessor.ImmersivePortalsAccessorCommon;
 
-import java.util.function.Supplier;
+#if MC_VER <= MC_1_19_2
+import com.seibel.distanthorizons.core.util.math.Mat4f;
+import com.mojang.math.Matrix4f;
+#endif
 
-public class ImmersivePortalsAccessorForge extends ImmersivePortalsAbstractAccessor
+public class ImmersivePortalsAccessorForge extends ImmersivePortalsAccessorCommon
 {
+	#if MC_VER <= MC_1_19_2
 	@Override
-	protected Object getClientLevel()
-	{
-		return Minecraft.getInstance().level;
+	protected Matrix4f convert(Mat4f matrix) {
+		return new Matrix4f(matrix.getValuesAsArray());
 	}
-	@Override
-	protected Class<?> getLevelClass()
-	{
-		return Level.class;
-	}
-	@Override
-	protected Iterable<?> getEntitiesForRendering()
-	{
-		return Minecraft.getInstance().level.entitiesForRendering();
-	}
-	@Override
-	protected Supplier<?> getFrustumSupplier()
-	{
-		return Suppliers.memoize(() -> {
-			Frustum frustum = new Frustum(
-				ClientApi.RENDER_STATE.mcModelViewMatrix.createJomlMatrix(),
-				RenderSystem.getProjectionMatrix()
-			);
-			
-			Vec3 cameraPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-			frustum.prepare(cameraPos.x, cameraPos.y, cameraPos.z);
-			
-			return frustum;
-		});
-	}
+	#endif
 	
 }

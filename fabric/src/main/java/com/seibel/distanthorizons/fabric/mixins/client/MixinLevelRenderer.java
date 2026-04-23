@@ -27,6 +27,7 @@ import com.mojang.math.Matrix4f;
 import org.lwjgl.opengl.GL32;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 #elif MC_VER < MC_1_21_6
+import com.seibel.distanthorizons.core.util.math.Mat4f;
 import net.minecraft.client.renderer.RenderType;
 import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Matrix4f;

@@ -20,7 +20,6 @@
 package com.seibel.distanthorizons.neoforge;
 
 import com.seibel.distanthorizons.common.AbstractModInitializer;
-import com.seibel.distanthorizons.common.ImmersivePortalsCompat;
 import com.seibel.distanthorizons.common.util.ProxyUtil;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
@@ -52,7 +51,6 @@ import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.opengl.GL32;
-import com.seibel.distanthorizons.common.ImmersivePortalsCompat;
 
 #if MC_VER < MC_1_20_6
 import net.neoforged.neoforge.event.TickEvent;
@@ -72,28 +70,6 @@ public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
 	
 	@Override
 	public void registerEvents() { NeoForge.EVENT_BUS.register(this); }
-	
-	
-	
-	//==============//
-	// world events //
-	//==============//
-	
-	@SubscribeEvent
-	public void clientLevelLoadEvent(LevelEvent.Load event)
-	{
-		LOGGER.info("level load");
-		
-		LevelAccessor level = event.getLevel();
-		if (!(level instanceof ClientLevel))
-		{
-			return;
-		}
-		
-		ClientLevel clientLevel = (ClientLevel) level;
-		IClientLevelWrapper clientLevelWrapper = ClientLevelWrapper.getWrapper(clientLevel, true);
-		ClientApi.INSTANCE.clientLevelLoadEvent(clientLevelWrapper);
-	}
 	
 	
 	

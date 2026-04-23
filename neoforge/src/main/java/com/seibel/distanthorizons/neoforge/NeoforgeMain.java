@@ -30,16 +30,10 @@ import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IC2meAccessor;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IOptifineAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.*;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.neoforge.wrappers.modAccessor.C2meAccessor;
-import com.seibel.distanthorizons.neoforge.wrappers.modAccessor.IrisAccessor;
+import com.seibel.distanthorizons.neoforge.wrappers.modAccessor.*;
 import com.seibel.distanthorizons.neoforge.wrappers.NeoforgeMinecraftRenderWrapper;
-import com.seibel.distanthorizons.neoforge.wrappers.modAccessor.ModChecker;
-import com.seibel.distanthorizons.neoforge.wrappers.modAccessor.OptifineAccessor;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.EventPriority;
@@ -148,6 +142,7 @@ public class NeoforgeMain extends AbstractModInitializer
 	{
 		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
 		this.tryCreateModCompatAccessor("c2me", IC2meAccessor.class, C2meAccessor::new);
+		this.tryCreateModCompatAccessor("immersive_portals_core", IImmersivePortalsAccessor.class, ImmersivePortalsAccessorNeoForge::new);
 		
 		#if MC_VER >= MC_1_20_6
 		// 1.20.6 is the lowest version Iris supports Neoforge
