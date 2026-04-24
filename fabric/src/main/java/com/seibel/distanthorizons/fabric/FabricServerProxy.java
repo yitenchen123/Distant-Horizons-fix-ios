@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.common.wrappers.misc.ServerPlayerWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ServerApi;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.common.AbstractPluginPacketSender;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
@@ -113,7 +114,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		ServerLevelEvents.LOAD.register((server, level) ->
 		#endif
 		{
-			ServerApi.INSTANCE.serverLevelLoadEvent(this.getServerLevelWrapper(level));
+			SharedApi.getAbstractDhWorld().getOrLoadLevel(this.getServerLevelWrapper(level));
 		});
 		
 		// ServerLevelUnloadEvent
@@ -123,7 +124,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		ServerLevelEvents.UNLOAD.register((server, level) ->
 		#endif
 		{
-			ServerApi.INSTANCE.serverLevelUnloadEvent(this.getServerLevelWrapper(level));
+			SharedApi.getAbstractDhWorld().unloadLevel(this.getServerLevelWrapper(level));
 		});
 		
 		// ServerChunkLoadEvent

@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCac
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.level.*;
@@ -15,6 +16,7 @@ import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
@@ -155,7 +157,10 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 				if (wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastRenderTime() > timeout)
 				{
 					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
-					ClientApi.INSTANCE.clientLevelUnloadEvent(wrapper);
+					AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+					if (world != null) {
+						world.unloadLevel(wrapper);
+					}
 					if (wrapper.isDhLevelLoaded()) {
 						wrapper.onUnload();
 					}

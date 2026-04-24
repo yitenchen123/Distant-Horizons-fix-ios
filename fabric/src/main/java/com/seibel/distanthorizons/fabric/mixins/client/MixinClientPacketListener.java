@@ -31,8 +31,7 @@ public class MixinClientPacketListener
 	@Inject(method = "handleLogin", at = @At("RETURN"))
 	void onHandleLoginEnd(CallbackInfo ci) 
 	{ 
-		ClientApi.INSTANCE.onClientOnlyConnected(); 
-		ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(this.level, true));
+		ClientApi.INSTANCE.onClientOnlyConnected();
 	}
 	
 	#if MC_VER < MC_1_19_4
