@@ -25,6 +25,8 @@ hs_err_pid*
 Merged/
 # Folder created by the buildAll scripts
 buildAllJars/
+_buildAllJars/
+_buildWorkers/
 
 relocate_natives/.venv/
 relocate_natives/__pycache__/
