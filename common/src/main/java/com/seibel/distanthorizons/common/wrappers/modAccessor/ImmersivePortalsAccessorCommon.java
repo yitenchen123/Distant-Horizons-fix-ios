@@ -40,6 +40,7 @@ public abstract class ImmersivePortalsAccessorCommon extends ImmersivePortalsAbs
 		return Minecraft.getInstance().level.entitiesForRendering();
 	}
 	
+	#if MC_VER < MC_1_21_6
 	private static Matrix4f getProjectionMatrix() {
 		#if MC_VER > MC_1_16_5
 		return RenderSystem.getProjectionMatrix();
@@ -53,6 +54,7 @@ public abstract class ImmersivePortalsAccessorCommon extends ImmersivePortalsAbs
 		}
 		#endif
 	}
+	#endif
 	
 	#if MC_VER <= MC_1_19_2
 	protected abstract Matrix4f convert(Mat4f matrix);
@@ -61,6 +63,7 @@ public abstract class ImmersivePortalsAccessorCommon extends ImmersivePortalsAbs
 	@Override
 	protected Supplier<?> getFrustumSupplier()
 	{
+		#if MC_VER < MC_1_21_6 // TODO Fix this for 1.21.6+ when a more modern version of Immersive Portals is available.
 		return Suppliers.memoize(() -> {
 			Frustum frustum = new Frustum(
 				#if MC_VER > MC_1_19_2
@@ -76,6 +79,9 @@ public abstract class ImmersivePortalsAccessorCommon extends ImmersivePortalsAbs
 			
 			return frustum;
 		});
+		#else
+		return null;
+		#endif
 	}
 	
 }
