@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.fabric.mixins.client;
 import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
 import com.seibel.distanthorizons.common.commonMixins.DhUpdateScreenBase;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen;
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.jar.installer.GitlabGetter;

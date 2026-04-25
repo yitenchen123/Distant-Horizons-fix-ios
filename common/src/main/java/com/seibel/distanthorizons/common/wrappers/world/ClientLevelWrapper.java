@@ -485,22 +485,6 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		return this.dimMinHeight;
 	}
 	
-	public IChunkWrapper tryGetChunk(DhChunkPos pos)
-	{
-		if (!this.level.hasChunk(pos.getX(), pos.getZ()))
-		{
-			return null;
-		}
-		
-		ChunkAccess chunk = this.level.getChunk(pos.getX(), pos.getZ(), ChunkStatus.EMPTY, false);
-		if (chunk == null)
-		{
-			return null;
-		}
-		
-		return new ChunkWrapper(chunk, this);
-	}
-	
 	@Override
 	public ClientLevel getWrappedMcObject() { return this.level; }
 	

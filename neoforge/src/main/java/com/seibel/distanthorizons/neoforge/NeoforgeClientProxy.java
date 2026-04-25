@@ -30,14 +30,12 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import net.minecraft.world.level.LevelAccessor;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.level.LevelEvent;
 
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -52,13 +50,7 @@ import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.opengl.GL32;
 
-#if MC_VER < MC_1_20_6
-import net.neoforged.neoforge.event.TickEvent;
-#else
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-
 import java.util.concurrent.AbstractExecutorService;
-#endif
 
 
 public class NeoforgeClientProxy implements AbstractModInitializer.IEventProxy
