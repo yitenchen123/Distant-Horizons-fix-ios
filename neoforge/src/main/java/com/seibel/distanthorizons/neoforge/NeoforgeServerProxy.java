@@ -7,7 +7,6 @@ import com.seibel.distanthorizons.common.wrappers.misc.ServerPlayerWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import com.seibel.distanthorizons.core.api.internal.ServerApi;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
@@ -88,7 +87,7 @@ public class NeoforgeServerProxy implements AbstractModInitializer.IEventProxy
 	{
 		if (GetEventLevel(event) instanceof ServerLevel)
 		{
-			SharedApi.getAbstractDhWorld().getOrLoadLevel(this.getServerLevelWrapper((ServerLevel) GetEventLevel(event)));
+			this.serverApi.serverLevelLoadEvent(this.getServerLevelWrapper((ServerLevel) GetEventLevel(event)));
 		}
 	}
 	
@@ -98,7 +97,7 @@ public class NeoforgeServerProxy implements AbstractModInitializer.IEventProxy
 	{
 		if (GetEventLevel(event) instanceof ServerLevel)
 		{
-			SharedApi.getAbstractDhWorld().unloadLevel(this.getServerLevelWrapper((ServerLevel) GetEventLevel(event)));
+			this.serverApi.serverLevelUnloadEvent(this.getServerLevelWrapper((ServerLevel) GetEventLevel(event)));
 		}
 	}
 	

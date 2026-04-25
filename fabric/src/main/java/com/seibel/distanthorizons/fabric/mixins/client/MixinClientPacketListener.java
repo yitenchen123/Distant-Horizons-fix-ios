@@ -63,6 +63,9 @@ public class MixinClientPacketListener
 		
 		executor.execute(() ->
 		{
+			// When Immersive Portals is present we might load a chunk from another level.
+			// This might cause LODs from another dimension to overwrite the LODs in the current dimension, which is generally undesirable.
+			if (chunk.getLevel() != this.level) return;
 			IClientLevelWrapper clientLevel = ClientLevelWrapper.getWrapper((ClientLevel) this.level);
 			SharedApi.INSTANCE.applyChunkUpdate(new ChunkWrapper(chunk, clientLevel), clientLevel);
 		});

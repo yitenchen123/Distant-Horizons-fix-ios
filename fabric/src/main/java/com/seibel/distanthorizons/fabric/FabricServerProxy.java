@@ -114,7 +114,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		ServerLevelEvents.LOAD.register((server, level) ->
 		#endif
 		{
-			SharedApi.getAbstractDhWorld().getOrLoadLevel(this.getServerLevelWrapper(level));
+			ServerApi.INSTANCE.serverLevelLoadEvent(this.getServerLevelWrapper(level));
 		});
 		
 		// ServerLevelUnloadEvent
@@ -124,7 +124,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		ServerLevelEvents.UNLOAD.register((server, level) ->
 		#endif
 		{
-			SharedApi.getAbstractDhWorld().unloadLevel(this.getServerLevelWrapper(level));
+			ServerApi.INSTANCE.serverLevelUnloadEvent(this.getServerLevelWrapper(level));
 		});
 		
 		// ServerChunkLoadEvent
