@@ -3,6 +3,7 @@
   "minVersion": "0.8",
   "package": "com.seibel.distanthorizons.fabric.mixins",
   "mixins": [
+    "client.AccessorMatrix4f",
     "server.MixinChunkGenerator",
     "server.MixinChunkMap",
     "server.MixinEntity",

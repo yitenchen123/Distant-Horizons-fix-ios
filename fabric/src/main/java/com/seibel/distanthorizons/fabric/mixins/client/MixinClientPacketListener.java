@@ -31,8 +31,7 @@ public class MixinClientPacketListener
 	@Inject(method = "handleLogin", at = @At("RETURN"))
 	void onHandleLoginEnd(CallbackInfo ci) 
 	{ 
-		ClientApi.INSTANCE.onClientOnlyConnected(); 
-		ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(this.level, true));
+		ClientApi.INSTANCE.onClientOnlyConnected();
 	}
 	
 	#if MC_VER < MC_1_19_4
@@ -61,10 +60,11 @@ public class MixinClientPacketListener
 			return;
 		}
 		
-		
+		// Important to get the level from the chunk because the client level might be different if Immersive Portals is present.
+		ClientLevel level = (ClientLevel) chunk.getLevel();
 		executor.execute(() ->
 		{
-			IClientLevelWrapper clientLevel = ClientLevelWrapper.getWrapper((ClientLevel) this.level);
+			IClientLevelWrapper clientLevel = ClientLevelWrapper.getWrapper(level);
 			SharedApi.INSTANCE.applyChunkUpdate(new ChunkWrapper(chunk, clientLevel), clientLevel);
 		});
 	}

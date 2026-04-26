@@ -24,9 +24,11 @@ import java.io.File;
 import com.mojang.blaze3d.platform.Window;
 import com.seibel.distanthorizons.common.wrappers.gui.NativeDialogUtil;
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.core.file.structure.ClientOnlySaveStructure;
 import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
@@ -43,9 +45,12 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 #if MC_VER < MC_1_19_2
@@ -60,6 +65,18 @@ import net.minecraft.util.profiling.Profiler;
 #if MC_VER <= MC_1_21_10
 import net.minecraft.client.GraphicsStatus;
 #else
+#endif
+
+#if  MC_VER <= MC_1_21_10
+import net.minecraft.resources.ResourceLocation;
+#else
+import net.minecraft.resources.Identifier;
+#endif
+
+#if  MC_VER > MC_1_19_2
+import net.minecraft.core.registries.Registries;
+#else
+import net.minecraft.core.Registry;
 #endif
 
 /**
@@ -432,6 +449,27 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 		{
 			return MINECRAFT.getSingleplayerServer().getPlayerCount();
 		}
+	}
+	
+	@Override
+	public IServerLevelWrapper getWrappedServerLevel(String levelKey)
+	{
+		if (!hasSinglePlayerServer()) return null;
+		#if  MC_VER <= MC_1_21_10
+		ResourceLocation levelID = ResourceLocation.tryParse(levelKey);
+		#else
+		Identifier levelID = Identifier.tryParse(levelKey);
+		#endif
+		if (levelID == null) return null;
+		
+		#if  MC_VER > MC_1_19_2
+		ResourceKey<Level> resourceKey = ResourceKey.create(Registries.DIMENSION, levelID);
+		#else
+		ResourceKey<Level> resourceKey = ResourceKey.create(Registry.DIMENSION_REGISTRY, levelID);
+		#endif
+		
+		ServerLevel level = MINECRAFT.getSingleplayerServer().getLevel(resourceKey);
+		return ServerLevelWrapper.getWrapper(level);
 	}
 	
 	//endregion

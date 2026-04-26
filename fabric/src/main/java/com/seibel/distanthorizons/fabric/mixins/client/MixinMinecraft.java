@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.fabric.mixins.client;
 import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
 import com.seibel.distanthorizons.common.commonMixins.DhUpdateScreenBase;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen;
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.jar.installer.GitlabGetter;
@@ -98,22 +96,6 @@ public abstract class MixinMinecraft
 		runnable.run();
 	}
 	#endif
-	
-	@Inject(at = @At("HEAD"), method = "updateLevelInEngines")
-	public void updateLevelInEngines(ClientLevel level, CallbackInfo ci)
-	{
-		if (this.lastLevel != null && level != this.lastLevel)
-		{
-			ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(this.lastLevel));
-		}
-		
-		if (level != null)
-		{
-			ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(level, true));
-		}
-		
-		this.lastLevel = level;
-	}
 	
 	@Inject(at = @At("HEAD"), method = "close()V")
 	public void close(CallbackInfo ci) { SelfUpdater.onClose(); }

@@ -5,16 +5,17 @@ import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegist
 import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
-import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.level.*;
 import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.util.TimerUtil;
+import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
@@ -24,7 +25,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,17 +33,11 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
+import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 #if MC_VER < MC_1_21_3
 import net.minecraft.world.phys.Vec3;
@@ -79,9 +73,9 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	
 	private boolean cloudColorFailLogged = false;
 	
-	private BlockStateWrapper dirtBlockWrapper;
-	private IDhLevel dhLevel;
-	
+	private volatile BlockStateWrapper dirtBlockWrapper;
+	private volatile IDhLevel dhLevel;
+	private volatile long lastAccessTime = System.currentTimeMillis();
 	
 	
 	//=============//
@@ -100,6 +94,73 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	//==================//
 	//region
 	
+	@Override
+	public synchronized void markAccessed() {
+		this.lastAccessTime = System.currentTimeMillis();
+	}
+	public synchronized long getLastAccessTime() { return this.lastAccessTime; }
+	
+	private static final Timer CLIENT_CLEANUP_TIMER = TimerUtil.CreateTimer("ClientLevelTickCleanup");
+	
+	private static final TimerTask CLIENT_CLEANUP_TASK = TimerUtil.createTimerTask(ClientLevelWrapper::tickCleanup);
+	
+	static
+	{
+		// 20 ticks per second (50ms interval)
+		CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
+	}
+	
+	private void unload() {
+		AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+		if (world != null) {
+			world.unloadLevel(this);
+		} else {
+			this.onUnload();
+		}
+	}
+	
+	public static void tickCleanup()
+	{
+		if (MINECRAFT.level == null) { return; }
+
+		long currentTime = System.currentTimeMillis();
+		long timeout = 30 * 1000;
+		
+		List<ClientLevelWrapper> toUnload = new ArrayList<>();
+
+		synchronized(LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
+		{
+			for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
+			{
+				ClientLevelWrapper wrapper = ref.get();
+				if (wrapper != null && wrapper.level != MINECRAFT.level)
+				{
+					// We use the synchronized getter to prevent race conditions with markAccessed()
+					if (currentTime - wrapper.getLastAccessTime() > timeout)
+					{
+						toUnload.add(wrapper);
+					}
+				}
+			}
+		}
+
+		for (ClientLevelWrapper wrapper : toUnload)
+		{
+			// Re-verify all conditions inside a synchronized block on the wrapper 
+			// to ensure atomicity with respect to markAccessed()
+			synchronized(wrapper)
+			{
+				if (wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastAccessTime() > timeout)
+				{
+					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
+					wrapper.unload();
+				}
+			}
+		}
+	}
+	
+	
+	
 	/** 
 	 * can be used when speed is important and the same level is likely to be passed in,
 	 * IE rendering.
@@ -107,9 +168,24 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Nullable
 	public static IClientLevelWrapper getWrapperIfDifferent(@Nullable IClientLevelWrapper levelWrapper, @NotNull ClientLevel level)
 	{
-		if (KEYED_CLIENT_LEVEL_MANAGER.isEnabled() && KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel() != levelWrapper)
+		if (KEYED_CLIENT_LEVEL_MANAGER.isEnabled())
 		{
-			return getWrapper(level);
+			IServerKeyedClientLevel keyedLevel = null;
+			if (KEYED_CLIENT_LEVEL_MANAGER instanceof KeyedClientLevelManager)
+			{
+				keyedLevel = ((KeyedClientLevelManager) KEYED_CLIENT_LEVEL_MANAGER).getServerKeyedLevel(level);
+			}
+			else
+			{
+				// FIXME: If the implementation is not KeyedClientLevelManager, 
+				// this fallback may return the key for the wrong dimension in multiverse scenarios.
+				keyedLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			}
+			
+			if (keyedLevel != levelWrapper)
+			{
+				return getWrapper(level);
+			}
 		}
 		
 		ClientLevelWrapper clientLevelWrapper = (ClientLevelWrapper)levelWrapper;
@@ -136,9 +212,31 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 			}
 			
 			// used if the client is connected to a server that defines the currently loaded level
-			IServerKeyedClientLevel overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			IServerKeyedClientLevel overrideLevel = null;
+			if (KEYED_CLIENT_LEVEL_MANAGER instanceof KeyedClientLevelManager)
+			{
+				overrideLevel = ((KeyedClientLevelManager) KEYED_CLIENT_LEVEL_MANAGER).getServerKeyedLevel(level);
+			}
+			else
+			{
+				// FIXME: If the implementation is not KeyedClientLevelManager, 
+				// this fallback may return the key for the wrong dimension in multiverse scenarios.
+				overrideLevel = KEYED_CLIENT_LEVEL_MANAGER.getServerKeyedLevel();
+			}
+			
 			if (overrideLevel != null)
 			{
+				WeakReference<ClientLevelWrapper> levelRef = LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.get(level);
+				if (levelRef != null && levelRef.get() != overrideLevel)
+				{
+					ClientLevelWrapper l = levelRef.get();
+					if (l != null) l.unload();
+					levelRef = null;
+				}
+				if (levelRef == null && overrideLevel instanceof ClientLevelWrapper)
+				{
+					LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.put(level, new WeakReference<>((ClientLevelWrapper) overrideLevel));
+				}
 				return overrideLevel;
 			}
 		}

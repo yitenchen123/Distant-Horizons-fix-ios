@@ -1,8 +1,25 @@
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
+
+#if  MC_VER <= MC_1_21_10
+import net.minecraft.resources.ResourceLocation;
+#else
+import net.minecraft.resources.Identifier;
+#endif
+
+#if  MC_VER > MC_1_19_2
+import net.minecraft.core.registries.Registries;
+#else
+import net.minecraft.core.Registry;
+#endif
 
 import java.io.File;
 
@@ -58,5 +75,25 @@ public class MinecraftServerWrapper implements IMinecraftSharedWrapper
 	}
 	
 	
+	
+	@Override
+	public IServerLevelWrapper getWrappedServerLevel(String levelKey)
+	{
+		#if  MC_VER <= MC_1_21_10
+		ResourceLocation levelID = ResourceLocation.tryParse(levelKey);
+		#else
+		Identifier levelID = Identifier.tryParse(levelKey);
+		#endif
+		if (levelID == null) return null;
+		
+		#if  MC_VER > MC_1_19_2
+		ResourceKey<Level> resourceKey = ResourceKey.create(Registries.DIMENSION, levelID);
+		#else
+		ResourceKey<Level> resourceKey = ResourceKey.create(Registry.DIMENSION_REGISTRY, levelID);
+		#endif
+		
+		ServerLevel level = dedicatedServer.getLevel(resourceKey);
+		return ServerLevelWrapper.getWrapper(level);
+	}
 	
 }

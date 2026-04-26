@@ -171,8 +171,6 @@ public class MixinLevelRenderer
 		ClientApi.RENDER_STATE.partialTickTime = MinecraftRenderWrapper.INSTANCE.getPartialTickTime();
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
 	    
-	    
-	    
 	    #if MC_VER < MC_1_21_6
 	    if (renderType.equals(RenderType.translucent())) 
 		{
