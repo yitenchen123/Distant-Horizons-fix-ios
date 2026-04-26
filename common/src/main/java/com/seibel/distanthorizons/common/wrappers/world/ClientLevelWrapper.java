@@ -159,23 +159,6 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		}
 	}
 	
-	@Nullable
-	public static ClientLevelWrapper getWrapperByDimensionName(String dimensionName)
-	{
-		synchronized (LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
-		{
-			for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
-			{
-				ClientLevelWrapper wrapper = ref.get();
-				if (wrapper != null && wrapper.getDimensionName().equals(dimensionName))
-				{
-					return wrapper;
-				}
-			}
-		}
-		return null;
-	}
-	
 	
 	
 	/** 
