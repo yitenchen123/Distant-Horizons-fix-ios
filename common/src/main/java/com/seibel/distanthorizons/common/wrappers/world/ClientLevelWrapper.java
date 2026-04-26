@@ -2,11 +2,9 @@ package com.seibel.distanthorizons.common.wrappers.world;
 
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiLevelType;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent;
 import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
-import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
@@ -15,21 +13,18 @@ import com.seibel.distanthorizons.core.level.*;
 import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.util.TimerUtil;
 import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,17 +33,11 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
+import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 #if MC_VER < MC_1_21_3
 import net.minecraft.world.phys.Vec3;
@@ -86,7 +75,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	
 	private volatile BlockStateWrapper dirtBlockWrapper;
 	private volatile IDhLevel dhLevel;
-	private volatile long lastRenderTime = System.currentTimeMillis();
+	private volatile long lastAccessTime = System.currentTimeMillis();
 	
 	
 	//=============//
@@ -106,22 +95,28 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	//region
 	
 	@Override
-	public synchronized void markRendered() {
-		this.lastRenderTime = System.currentTimeMillis();
+	public synchronized void markAccessed() {
+		this.lastAccessTime = System.currentTimeMillis();
 	}
-	public synchronized long getLastRenderTime() { return this.lastRenderTime; }
-	public boolean isDhLevelLoaded() {
-		return this.dhLevel != null;
-	}
+	public synchronized long getLastAccessTime() { return this.lastAccessTime; }
 	
-	private static final java.util.Timer CLIENT_CLEANUP_TIMER = com.seibel.distanthorizons.core.util.TimerUtil.CreateTimer("ClientLevelTickCleanup");
+	private static final Timer CLIENT_CLEANUP_TIMER = TimerUtil.CreateTimer("ClientLevelTickCleanup");
 	
-	private static final java.util.TimerTask CLIENT_CLEANUP_TASK = com.seibel.distanthorizons.core.util.TimerUtil.createTimerTask(() -> com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.tickCleanup());
+	private static final TimerTask CLIENT_CLEANUP_TASK = TimerUtil.createTimerTask(ClientLevelWrapper::tickCleanup);
 	
 	static
 	{
 		// 20 ticks per second (50ms interval)
 		CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
+	}
+	
+	private void unload() {
+		AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+		if (world != null) {
+			world.unloadLevel(this);
+		} else {
+			this.onUnload();
+		}
 	}
 	
 	public static void tickCleanup()
@@ -130,18 +125,18 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 
 		long currentTime = System.currentTimeMillis();
 		long timeout = 30 * 1000;
-
-		java.util.List<ClientLevelWrapper> toUnload = new java.util.ArrayList<>();
+		
+		List<ClientLevelWrapper> toUnload = new ArrayList<>();
 
 		synchronized(LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
 		{
-			for (java.lang.ref.WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
+			for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
 			{
 				ClientLevelWrapper wrapper = ref.get();
-				if (wrapper != null && wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level)
+				if (wrapper != null && wrapper.level != MINECRAFT.level)
 				{
-					// We use the synchronized getter to prevent race conditions with markRendered()
-					if (currentTime - wrapper.getLastRenderTime() > timeout)
+					// We use the synchronized getter to prevent race conditions with markAccessed()
+					if (currentTime - wrapper.getLastAccessTime() > timeout)
 					{
 						toUnload.add(wrapper);
 					}
@@ -152,20 +147,13 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		for (ClientLevelWrapper wrapper : toUnload)
 		{
 			// Re-verify all conditions inside a synchronized block on the wrapper 
-			// to ensure atomicity with respect to markRendered()
+			// to ensure atomicity with respect to markAccessed()
 			synchronized(wrapper)
 			{
-				if (wrapper.isDhLevelLoaded() && wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastRenderTime() > timeout)
+				if (wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastAccessTime() > timeout)
 				{
 					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
-					AbstractDhWorld world = SharedApi.getAbstractDhWorld();
-					if (world != null) {
-						world.unloadLevel(wrapper);
-						ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelUnloadEvent.class, new DhApiLevelUnloadEvent.EventParam(wrapper));
-					}
-					if (wrapper.isDhLevelLoaded()) {
-						wrapper.onUnload();
-					}
+					wrapper.unload();
 				}
 			}
 		}
@@ -255,6 +243,17 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 			
 			if (overrideLevel != null)
 			{
+				WeakReference<ClientLevelWrapper> levelRef = LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.get(level);
+				if (levelRef != null && levelRef.get() != overrideLevel)
+				{
+					ClientLevelWrapper l = levelRef.get();
+					if (l != null) l.unload();
+					levelRef = null;
+				}
+				if (levelRef == null && overrideLevel instanceof ClientLevelWrapper)
+				{
+					LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.put(level, new WeakReference<>((ClientLevelWrapper) overrideLevel));
+				}
 				return overrideLevel;
 			}
 		}

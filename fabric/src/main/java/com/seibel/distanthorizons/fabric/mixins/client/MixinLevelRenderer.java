@@ -194,11 +194,6 @@ public class MixinLevelRenderer
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
 		
-		if (ClientApi.RENDER_STATE.clientLevelWrapper instanceof ClientLevelWrapper)
-		{
-			((ClientLevelWrapper) ClientApi.RENDER_STATE.clientLevelWrapper).markRendered();
-		}
-		
 		// only crash during development
 		if (ModInfo.IS_DEV_BUILD)
 		{
