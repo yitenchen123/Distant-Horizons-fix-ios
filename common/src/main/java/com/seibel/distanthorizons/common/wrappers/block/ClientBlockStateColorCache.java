@@ -260,39 +260,55 @@ public class ClientBlockStateColorCache
 					&& !quads.isEmpty() 
 					&& quads.get(0) != null)
 				{
-					BakedQuad firstQuad = quads.get(0);
+					try
+					{
+						BakedQuad firstQuad = quads.get(0);
 					
-					#if MC_VER <= MC_1_21_11
-					this.needPostTinting = firstQuad.isTinted();
-					#else
-					this.needPostTinting = firstQuad.materialInfo().isTinted();
-					#endif
+						#if MC_VER <= MC_1_21_11
+						this.needPostTinting = firstQuad.isTinted();
+						#else
+						this.needPostTinting = firstQuad.materialInfo().isTinted();
+						#endif
 					
-					#if MC_VER <= MC_1_21_4
-					this.tintIndex = firstQuad.getTintIndex();
-					#elif MC_VER <= MC_1_21_11
-					this.tintIndex = firstQuad.tintIndex();
-					#else
-					this.tintIndex = firstQuad.materialInfo().tintIndex();
-					#endif
-					
-					#if MC_VER < MC_1_17_1
-					this.baseColor = calculateColorFromTexture(
-                        firstQuad.sprite,
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#elif MC_VER < MC_1_21_5
-					this.baseColor = calculateColorFromTexture(
-                        firstQuad.getSprite(),
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#elif MC_VER <= MC_1_21_11
-					this.baseColor = calculateColorFromTexture(
-						firstQuad.sprite(),
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#else
-					this.baseColor = calculateColorFromTexture(
-						firstQuad.materialInfo().sprite(),
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#endif
+						#if MC_VER <= MC_1_21_4
+						this.tintIndex = firstQuad.getTintIndex();
+						#elif MC_VER <= MC_1_21_11
+						this.tintIndex = firstQuad.tintIndex();
+						#else
+						this.tintIndex = firstQuad.materialInfo().tintIndex();
+						#endif
+						
+						#if MC_VER < MC_1_17_1
+						this.baseColor = calculateColorFromTexture(
+	                        firstQuad.sprite,
+							EColorMode.getColorMode(this.blockState.getBlock()));
+						#elif MC_VER < MC_1_21_5
+						this.baseColor = calculateColorFromTexture(
+	                        firstQuad.getSprite(),
+							EColorMode.getColorMode(this.blockState.getBlock()));
+						#elif MC_VER <= MC_1_21_11
+						this.baseColor = calculateColorFromTexture(
+							firstQuad.sprite(),
+							EColorMode.getColorMode(this.blockState.getBlock()));
+						#else
+						this.baseColor = calculateColorFromTexture(
+							firstQuad.materialInfo().sprite(),
+							EColorMode.getColorMode(this.blockState.getBlock()));
+						#endif
+					}
+					catch (Exception e)
+					{
+						// Shouldn't normally happen, but there was at least 
+						// one report of MC's texture being un-loaded
+						// which prevented us from getting the texture.
+						// So we should have some basic backup logic.
+						
+						LOGGER.warn("Failed to get texture color for block ["+this.blockStateWrapper.getSerialString()+"] due to: ["+e.getMessage()+"], falling back to particle color.");
+						
+						this.needPostTinting = false;
+						this.tintIndex = 0;
+						this.baseColor = this.getParticleIconColor();
+					}
 				}
 				else
 				{
@@ -399,22 +415,14 @@ public class ClientBlockStateColorCache
 					int scale = 1;
 					if (colorMode == EColorMode.Leaves)
 					{
-						//switch (//FIXME add config option)
-						//	case BLACK:
-						//	a = 255; //simulate black background of fast leaves
-						//		break;
-						//	case IGNORE:
-							if (a == 0) {
-								continue; //same long grass
-							}
-							else
-							{
-								a = 255; //just in case there are semi transparent pixels
-							}					
-						//		break;
-						//	case TRANSPARENT:
-						//		break; //do nothing, let it count towards transparency
-						
+						if (a == 0)
+						{
+							continue; //same long grass
+						}
+						else
+						{
+							a = 255; //just in case there are semi transparent pixels
+						}
 					}
 					else if (a == 0 && colorMode != EColorMode.Glass)
 					{
