@@ -60,10 +60,11 @@ public class GLBuffer implements AutoCloseable
 	 * is called with a large ByteBuffer in one shot. To work around it we split
 	 * the upload into smaller sub-data calls that each fit comfortably inside the
 	 * driver's internal staging path. <br>
-	 * 1 MiB picked as a safe default — small enough to avoid the bridge crash
-	 * yet large enough that per-call overhead is negligible.
+	 * 256 KiB tuned empirically against macOS 26.5 — a 1 MiB chunk still
+	 * tripped the same {@code _platform_memmove} crash inside
+	 * {@code glBufferSubData_Exec}, but 256 KiB consistently survives.
 	 */
-	public static final int MAC_UPLOAD_CHUNK_BYTES = 1 * 1024 * 1024;
+	public static final int MAC_UPLOAD_CHUNK_BYTES = 256 * 1024;
 	/** Threshold above which the chunked path kicks in on macOS. */
 	public static final int MAC_UPLOAD_CHUNK_THRESHOLD = MAC_UPLOAD_CHUNK_BYTES;
 	/** the number of active buffers, can be used for debugging */
@@ -414,6 +415,14 @@ public class GLBuffer implements AutoCloseable
 				bb.limit(origPos + uploaded + chunk);
 				GL32.glBufferSubData(target, (long) (baseOffset + uploaded), bb);
 				uploaded += chunk;
+				// Force the driver to drain its command queue between chunks
+				// so the OpenGL → Metal bridge processes (and frees) each
+				// staging copy before the next sub-data call piles another
+				// memmove on top of it.
+				if (uploaded < total)
+				{
+					GL32.glFlush();
+				}
 			}
 		}
 		finally
