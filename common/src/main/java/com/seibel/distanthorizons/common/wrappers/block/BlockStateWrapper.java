@@ -167,20 +167,46 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			return AIR;
 		}
 		
-		// create a wrapper specifically for the API event to use
-		BlockStateWrapper apiWrapper = new BlockStateWrapper(blockState, levelWrapper, null);
-		DhApiBlockStateWrapperCreatedEvent.EventParam eventParam = new DhApiBlockStateWrapperCreatedEvent.EventParam(apiWrapper);
-		ApiEventInjector.INSTANCE.fireAllEvents(DhApiBlockStateWrapperCreatedEvent.class, eventParam);
-		
-		if (!eventParam.getOverridesSet())
+		// pooling wrappers significantly improves chunk->LOD processing speed
+		// and also reduces GC pressure
+		BlockStateWrapper existingWrapper = WRAPPER_BY_BLOCK_STATE.get(blockState);
+		if (existingWrapper != null)
 		{
-			// no changes needed, use the existing object
-			return apiWrapper;
+			return existingWrapper;
 		}
 		
-		// create a new wrapper using whatever overrides the API user set
-		BlockStateWrapper returnWrapper = new BlockStateWrapper(blockState, levelWrapper, eventParam);
-		return returnWrapper;
+		
+		
+		// synchronized so the API event only fires once per block
+		synchronized (WRAPPER_BY_BLOCK_STATE)
+		{
+			// if another thread already finished this block, use that wrapper
+			existingWrapper = WRAPPER_BY_BLOCK_STATE.get(blockState);
+			if (existingWrapper != null)
+			{
+				return existingWrapper;
+			}
+			
+			
+			// create a wrapper specifically for the API event to use
+			BlockStateWrapper apiWrapper = new BlockStateWrapper(blockState, levelWrapper, null);
+			DhApiBlockStateWrapperCreatedEvent.EventParam eventParam = new DhApiBlockStateWrapperCreatedEvent.EventParam(apiWrapper);
+			ApiEventInjector.INSTANCE.fireAllEvents(DhApiBlockStateWrapperCreatedEvent.class, eventParam);
+			
+			if (!eventParam.getOverridesSet())
+			{
+				// no API changes needed, use the existing object
+				WRAPPER_BY_BLOCK_STATE.putIfAbsent(blockState, apiWrapper);
+				return apiWrapper;
+			}
+			else
+			{
+				// create a new wrapper using whatever overrides the API user set
+				BlockStateWrapper returnWrapper = new BlockStateWrapper(blockState, levelWrapper, eventParam);
+				WRAPPER_BY_BLOCK_STATE.putIfAbsent(blockState, returnWrapper);
+				return returnWrapper;
+			}
+		}
 	}
 	private BlockStateWrapper(
 		@Nullable BlockState blockState, ILevelWrapper levelWrapper, 
@@ -1000,6 +1026,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			// put if absent in case two threads deserialize at the same time
 			// unfortunately we can't put everything in a computeIfAbsent() since we also throw exceptions
 			WRAPPER_BY_RESOURCE_LOCATION.putIfAbsent(finalResourceStateString, foundWrapper);
+			WRAPPER_BY_BLOCK_STATE.putIfAbsent(foundWrapper.blockState, foundWrapper);
 		}
 	}
 	
