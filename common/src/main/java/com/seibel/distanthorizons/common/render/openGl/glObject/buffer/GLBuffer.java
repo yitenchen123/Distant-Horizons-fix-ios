@@ -23,6 +23,7 @@ import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.common.render.openGl.glObject.GLProxy;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftGLWrapper;
 import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
@@ -52,6 +53,20 @@ public class GLBuffer implements AutoCloseable
 	
 	public static final double BUFFER_EXPANSION_MULTIPLIER = 1.3;
 	public static final double BUFFER_SHRINK_TRIGGER = BUFFER_EXPANSION_MULTIPLIER * BUFFER_EXPANSION_MULTIPLIER;
+
+	/**
+	 * On macOS the legacy OpenGL → Metal bridge crashes with SIGBUS in
+	 * {@code _platform_memmove} when {@code glBufferData}/{@code glBufferSubData}
+	 * is called with a large ByteBuffer in one shot. To work around it we split
+	 * the upload into smaller sub-data calls that each fit comfortably inside the
+	 * driver's internal staging path. <br>
+	 * 256 KiB tuned empirically against macOS 26.5 — a 1 MiB chunk still
+	 * tripped the same {@code _platform_memmove} crash inside
+	 * {@code glBufferSubData_Exec}, but 256 KiB consistently survives.
+	 */
+	public static final int MAC_UPLOAD_CHUNK_BYTES = 256 * 1024;
+	/** Threshold above which the chunked path kicks in on macOS. */
+	public static final int MAC_UPLOAD_CHUNK_THRESHOLD = MAC_UPLOAD_CHUNK_BYTES;
 	/** the number of active buffers, can be used for debugging */
 	public static AtomicInteger bufferCount = new AtomicInteger(0);
 	
@@ -320,25 +335,101 @@ public class GLBuffer implements AutoCloseable
 	protected void uploadBufferData(ByteBuffer bb, int bufferDataHint)
 	{
 		LodUtil.assertTrue(!this.bufferStorage, "Buffer is bufferStorage but its trying to use bufferData upload method!");
-		
+
 		int bbSize = bb.limit() - bb.position();
-		GL32.glBufferData(this.getBufferBindingTarget(), bb, bufferDataHint);
+		int target = this.getBufferBindingTarget();
+
+		if (shouldChunkUpload(bbSize))
+		{
+			// Two-step path used on macOS to dodge the Apple OpenGL → Metal
+			// memmove SIGBUS triggered by uploading a large ByteBuffer in one
+			// glBufferData call:
+			//   1) allocate-only with the size overload (no memcpy)
+			//   2) fill the buffer through chunked glBufferSubData calls
+			GL32.glBufferData(target, (long) bbSize, bufferDataHint);
+			uploadInChunks(target, 0, bb, MAC_UPLOAD_CHUNK_BYTES);
+		}
+		else
+		{
+			GL32.glBufferData(target, bb, bufferDataHint);
+		}
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
 	protected void uploadSubData(ByteBuffer bb, int maxExpansionSize, int bufferDataHint)
 	{
 		LodUtil.assertTrue(!this.bufferStorage, "Buffer is bufferStorage but its trying to use subData upload method!");
-		
+
 		int bbSize = bb.limit() - bb.position();
+		int target = this.getBufferBindingTarget();
 		if (this.size < bbSize || this.size > bbSize * BUFFER_SHRINK_TRIGGER)
 		{
 			int newSize = (int) (bbSize * BUFFER_EXPANSION_MULTIPLIER);
 			if (newSize > maxExpansionSize) newSize = maxExpansionSize;
-			GL32.glBufferData(this.getBufferBindingTarget(), newSize, bufferDataHint);
+			// allocate-only — no memcpy, safe on macOS regardless of size
+			GL32.glBufferData(target, (long) newSize, bufferDataHint);
 			this.size = newSize;
 		}
-		GL32.glBufferSubData(this.getBufferBindingTarget(), 0, bb);
+
+		if (shouldChunkUpload(bbSize))
+		{
+			uploadInChunks(target, 0, bb, MAC_UPLOAD_CHUNK_BYTES);
+		}
+		else
+		{
+			GL32.glBufferSubData(target, 0, bb);
+		}
+	}
+
+	/**
+	 * macOS-only mitigation for the SIGBUS in
+	 * {@code libsystem_platform.dylib _platform_memmove} that happens when the
+	 * Apple OpenGL → Metal translation layer copies a single large ByteBuffer
+	 * out of LWJGL into driver memory. Splitting the copy into
+	 * {@link #MAC_UPLOAD_CHUNK_BYTES} slices keeps every memmove inside a size
+	 * the bridge handles reliably.
+	 */
+	private static boolean shouldChunkUpload(int byteCount)
+	{
+		return byteCount > MAC_UPLOAD_CHUNK_THRESHOLD && EPlatform.get() == EPlatform.MACOS;
+	}
+
+	/**
+	 * Uploads {@code bb} into the currently bound buffer at {@code baseOffset}
+	 * using a sequence of {@link GL32#glBufferSubData(int, long, ByteBuffer)}
+	 * calls of at most {@code chunkBytes} each. The buffer's position/limit are
+	 * restored before returning.
+	 */
+	private static void uploadInChunks(int target, int baseOffset, ByteBuffer bb, int chunkBytes)
+	{
+		final int origPos = bb.position();
+		final int origLimit = bb.limit();
+		try
+		{
+			final int total = origLimit - origPos;
+			int uploaded = 0;
+			while (uploaded < total)
+			{
+				int chunk = Math.min(chunkBytes, total - uploaded);
+				bb.position(origPos + uploaded);
+				bb.limit(origPos + uploaded + chunk);
+				GL32.glBufferSubData(target, (long) (baseOffset + uploaded), bb);
+				uploaded += chunk;
+				// Force the driver to drain its command queue between chunks
+				// so the OpenGL → Metal bridge processes (and frees) each
+				// staging copy before the next sub-data call piles another
+				// memmove on top of it.
+				if (uploaded < total)
+				{
+					GL32.glFlush();
+				}
+			}
+		}
+		finally
+		{
+			bb.limit(origLimit);
+			bb.position(origPos);
+		}
 	}
 	
 	//endregion
