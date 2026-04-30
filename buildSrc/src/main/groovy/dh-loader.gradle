@@ -54,7 +54,10 @@ repositories {
         url "https://www.cursemaven.com"
         content { includeGroup "curse.maven" }
     }
-    maven { url "https://repo.spongepowered.org/maven/" }
+    maven {
+        url "https://repo.spongepowered.org/maven/"
+        content { excludeGroupByRegex "net\\.fabricmc(\\..*)?" }
+    }
     maven { url "https://maven.terraformersmc.com/" }
     maven { url "https://maven.neoforged.net/releases/" }
     flatDir {
