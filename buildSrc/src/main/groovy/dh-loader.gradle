@@ -56,6 +56,8 @@ repositories {
     }
     maven {
         url "https://repo.spongepowered.org/maven/"
+		// exclusion is needed since sponge has a deprecated version of fabric
+		// that gradle would prefer to get over the up-to-date version modrinth provides
         content { excludeGroupByRegex "net\\.fabricmc(\\..*)?" }
     }
     maven { url "https://maven.terraformersmc.com/" }
