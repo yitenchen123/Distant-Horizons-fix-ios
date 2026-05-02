@@ -7,7 +7,6 @@ import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IImmersivePortalsAccessor;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
 import net.minecraft.client.Camera;
@@ -15,7 +14,6 @@ import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.material.FogType;
 
 
 import net.minecraft.client.Camera;
@@ -96,14 +94,6 @@ public class MixinVanillaFogCommon
 		cancelFog = cancelFog && !SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class).isFogStateSpecial();
 		cancelFog = cancelFog && !Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
 		
-		
-		
-		IImmersivePortalsAccessor immersivePortals = ModAccessorInjector.INSTANCE.get(IImmersivePortalsAccessor.class);
-		if (immersivePortals != null
-			&& immersivePortals.isRenderingPortal())
-		{
-			cancelFog = false;
-		}
 		
 		return cancelFog;
 	}

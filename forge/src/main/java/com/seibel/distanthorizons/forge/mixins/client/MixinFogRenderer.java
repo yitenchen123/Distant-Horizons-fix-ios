@@ -19,10 +19,8 @@
 
 package com.seibel.distanthorizons.forge.mixins.client;
 
+import com.seibel.distanthorizons.common.commonMixins.MixinVanillaFogCommon;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -33,14 +31,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.FogRenderer.FogMode;
-import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-#if MC_VER < MC_1_17_1
-import net.minecraft.world.level.material.FluidState;
-#else
-import net.minecraft.world.level.material.FogType;
-#endif
 
 @Mixin(FogRenderer.class)
 public class MixinFogRenderer
@@ -55,29 +45,25 @@ public class MixinFogRenderer
 			remap = #if MC_VER == MC_1_17_1 || MC_VER == MC_1_18_2 false #else true #endif ) // Remap messiness due to this being weird in forge
 	private static void disableSetupFog(Camera camera, FogMode fogMode, float f, boolean bl, float partTick, CallbackInfo callback)
 	{
-		#if MC_VER < MC_1_17_1
-		FluidState fluidState = camera.getFluidInCamera();
-		boolean cameraNotInFluid = fluidState.isEmpty();
+		#if MC_VER < MC_1_21_6
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog(camera, fogMode);
+		#elif MC_VER < MC_1_21_6
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog(camera);
 		#else
-		FogType fogTypes = camera.getFluidInCamera();
-		boolean cameraNotInFluid = fogTypes == FogType.NONE;
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog();
 		#endif
 		
-		
-		Entity entity = camera.getEntity();
-		boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
-		if (!isSpecialFog 
-			&& cameraNotInFluid 
-			&& fogMode == FogMode.FOG_TERRAIN
-			&& !SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class).isFogStateSpecial()
-			&& !Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get())
+		if (cancelFog)
 		{
 			#if MC_VER < MC_1_17_1
 			RenderSystem.fogStart(A_REALLY_REALLY_BIG_VALUE);
 			RenderSystem.fogEnd(A_EVEN_LARGER_VALUE);
-			#else
+			#elif MC_VER < MC_1_21_3
 			RenderSystem.setShaderFogStart(A_REALLY_REALLY_BIG_VALUE);
 			RenderSystem.setShaderFogEnd(A_EVEN_LARGER_VALUE);
+			#elif MC_VER < MC_1_21_6
+			callback.setReturnValue(FogParameters.NO_FOG);
+			#else
 			#endif
 			
 			ClientApi.RENDER_STATE.vanillaFogEnabled = false;
@@ -86,6 +72,7 @@ public class MixinFogRenderer
 		{
 			ClientApi.RENDER_STATE.vanillaFogEnabled = true;
 		}
+		
 	}
 	
 }
