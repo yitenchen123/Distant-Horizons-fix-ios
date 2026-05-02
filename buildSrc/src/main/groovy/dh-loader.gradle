@@ -366,6 +366,23 @@ if (isNotCommonProject) {
                 !arg.startsWith("-XX:MaxGCPauseMillis")
             }
             runTask.jvmArgs = filteredArgs
+
+            // fix (Neo)forge debug running
+            doFirst {
+                def modsDir = rootProject.file("run/${isClient ? 'client' : 'server'}/mods")
+                modsDir.mkdirs()
+                
+                // Remove any stale DH jars before copying the fresh one
+                modsDir.listFiles()?.each { file ->
+                    if (file.name.startsWith(rootProject.mod_name)) file.delete()
+                }
+                
+                // Copy shadow jar into mods folder so (Neo)Forge discovers it properly
+                copy {
+                    from shadowJar.archiveFile
+                    into modsDir
+                }
+            }
             
             // JVM args
             runTask.jvmArgs(
