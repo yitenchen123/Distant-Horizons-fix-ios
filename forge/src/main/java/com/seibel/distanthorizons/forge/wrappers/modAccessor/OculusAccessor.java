@@ -23,35 +23,50 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 
+#if MC_VER == MC_1_20_1
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.api.v0.IrisApi;
+#else
+#endif
+
 public class OculusAccessor implements IIrisAccessor
 {
 	protected static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	
 	public OculusAccessor()
-	{
-		LOGGER.warn("Partial Oculus support enabled. Some DH features may be disabled or behave strangely, use Iris instead if possible.");
-	}
+	{ LOGGER.warn("Partial Oculus support enabled. Some DH features may be disabled or behave strangely, use Iris instead if possible."); }
 	
 	
 	
 	@Override
 	public String getModName()
 	{
-		return "oculus";
+		#if MC_VER == MC_1_20_1
+		return Iris.MODID;
+		#else
+		return "iris"; // Oculus doesn't support this MC version
+		#endif
 	}
 	
 	@Override
 	public boolean isShaderPackInUse()
 	{
-		// assume shaders are always active
-		return true;
+		#if MC_VER == MC_1_20_1
+		return IrisApi.getInstance().isShaderPackInUse();
+		#else
+		return true; // Oculus doesn't support this MC version
+		#endif
 	}
 	
 	@Override
 	public boolean isRenderingShadowPass()
 	{
-		return false;
+		#if MC_VER == MC_1_20_1
+		return IrisApi.getInstance().isRenderingShadowPass();
+		#else
+		return false; // Oculus doesn't support this MC version
+		#endif
 	}
 	
 }
