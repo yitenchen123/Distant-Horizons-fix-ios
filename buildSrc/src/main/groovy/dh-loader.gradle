@@ -393,7 +393,8 @@ if (isNotCommonProject) {
                 //"-XX:+ZGenerational",
                 rootProject.minecraftMemoryJavaArg,
             )
-            if (isClient) {
+            if (isClient) 
+            {
                 runTask.jvmArgs(
                     "-Dminecraft.api.auth.host=https://nope.invalid",
                     "-Dminecraft.api.account.host=https://nope.invalid",
@@ -404,9 +405,17 @@ if (isNotCommonProject) {
                     // use a consistent username for easier debugging in a given world (vs randomly teleporting to a new user each time the game boots)
                     "--username", "Dev",
                     // "--renderDebugLabels" is a Mojang command to show render names in RenderDoc
-                    "--renderDebugLabels",
+                    "--renderDebugLabels"
+                    )
+                
+                // enabling tracy causes constant memory growth so it isn't always desired
+                if (rootProject.minecraftEnableTracy == "true")
+                {
                     // "--tracy" is a Mojang command to allow individual frames to be debugged using Tracy https://github.com/wolfpld/tracy/releases/tag/v0.13.1
-                    "--tracy")
+                    runTask.args("--tracy")
+                }
+                
+                
             }
         }
     }
