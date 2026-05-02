@@ -78,6 +78,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	private volatile long lastAccessTime = System.currentTimeMillis();
 	
 	
+	
 	//=============//
 	// constructor //
 	//=============//
@@ -95,14 +96,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	//region
 	
 	@Override
-	public synchronized void markAccessed() {
-		this.lastAccessTime = System.currentTimeMillis();
-	}
+	public synchronized void markAccessed() { this.lastAccessTime = System.currentTimeMillis(); }
 	public synchronized long getLastAccessTime() { return this.lastAccessTime; }
-	
-	private static final Timer CLIENT_CLEANUP_TIMER = TimerUtil.CreateTimer("ClientLevelTickCleanup");
-	
-	private static final TimerTask CLIENT_CLEANUP_TASK = TimerUtil.createTimerTask(ClientLevelWrapper::tickCleanup);
 	
 	static
 	{
@@ -110,30 +105,37 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		CLIENT_CLEANUP_TIMER.scheduleAtFixedRate(CLIENT_CLEANUP_TASK, 0, 1000 / 20);
 	}
 	
-	private void unload() {
+	private void unload()
+	{
 		AbstractDhWorld world = SharedApi.getAbstractDhWorld();
-		if (world != null) {
+		if (world != null)
+		{
 			world.unloadLevel(this);
-		} else {
+		}
+		else
+		{
 			this.onUnload();
 		}
 	}
 	
 	public static void tickCleanup()
 	{
-		if (MINECRAFT.level == null) { return; }
-
+		if (MINECRAFT.level == null) 
+		{
+			return; 
+		}
+		
 		long currentTime = System.currentTimeMillis();
 		long timeout = 30 * 1000;
 		
-		List<ClientLevelWrapper> toUnload = new ArrayList<>();
-
+		ArrayList<ClientLevelWrapper> toUnload = new ArrayList<>();
 		synchronized(LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL)
 		{
 			for (WeakReference<ClientLevelWrapper> ref : LEVEL_WRAPPER_REF_BY_CLIENT_LEVEL.values())
 			{
 				ClientLevelWrapper wrapper = ref.get();
-				if (wrapper != null && wrapper.level != MINECRAFT.level)
+				if (wrapper != null 
+					&& wrapper.level != MINECRAFT.level)
 				{
 					// We use the synchronized getter to prevent race conditions with markAccessed()
 					if (currentTime - wrapper.getLastAccessTime() > timeout)
@@ -143,16 +145,17 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 				}
 			}
 		}
-
+		
 		for (ClientLevelWrapper wrapper : toUnload)
 		{
 			// Re-verify all conditions inside a synchronized block on the wrapper 
 			// to ensure atomicity with respect to markAccessed()
 			synchronized(wrapper)
 			{
-				if (wrapper.level != MINECRAFT.level && currentTime - wrapper.getLastAccessTime() > timeout)
+				if (wrapper.level != MINECRAFT.level 
+					&& currentTime - wrapper.getLastAccessTime() > timeout)
 				{
-					LOGGER.debug("Unloading level " + wrapper.getDhIdentifier() + " due to inactivity");
+					LOGGER.debug("Unloading level [" + wrapper.getDhIdentifier() + "] due to inactivity");
 					wrapper.unload();
 				}
 			}

@@ -44,31 +44,26 @@ import java.util.function.Supplier;
 public abstract class ImmersivePortalsAccessorCommon extends ImmersivePortalsAbstractAccessor
 {
 	@Override
-	protected Object getClientLevel()
-	{
-		return Minecraft.getInstance().level;
-	}
+	protected Object getClientLevel() { return Minecraft.getInstance().level; }
 	@Override
-	protected Class<?> getLevelClass()
-	{
-		return Level.class;
-	}
+	protected Class<?> getLevelClass() { return Level.class; }
 	@Override
-	protected Iterable<?> getEntitiesForRendering()
-	{
-		return Minecraft.getInstance().level.entitiesForRendering();
-	}
+	protected Iterable<?> getEntitiesForRendering() { return Minecraft.getInstance().level.entitiesForRendering(); }
 	
 	#if MC_VER < MC_1_21_6
-	private static Matrix4f getProjectionMatrix() {
+	private static Matrix4f getProjectionMatrix() 
+	{
 		#if MC_VER > MC_1_16_5
 		return RenderSystem.getProjectionMatrix();
 		#else
-		try {
+		try 
+		{
 			Class<?> renderStates = Class.forName("com.qouteall.immersive_portals.render.context_management.RenderStates");
 			Field projectionMatrix = renderStates.getField("projectionMatrix");
 			return (Matrix4f) projectionMatrix.get(null);
-		} catch (Throwable e) {
+		} 
+		catch (Throwable e) 
+		{
 			throw new RuntimeException(e);
 		}
 		#endif
