@@ -139,7 +139,7 @@ public class MixinFogRenderer
 	)
 	private void onSetRenderDistanceEnd(FogData instance, float value, Operation<Void> original)
 	{
-		if (cancelFog())
+		if (MixinVanillaFogCommon.cancelFog())
 		{
 			instance.environmentalStart = A_REALLY_REALLY_BIG_VALUE;
 			instance.environmentalEnd = A_EVEN_LARGER_VALUE;
