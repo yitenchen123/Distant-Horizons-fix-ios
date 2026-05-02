@@ -64,6 +64,10 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	
 	private static final Minecraft MINECRAFT = Minecraft.getInstance();
 	
+	private static final Timer CLIENT_CLEANUP_TIMER = TimerUtil.CreateTimer("ClientLevelTickCleanup");
+	private static final TimerTask CLIENT_CLEANUP_TASK = TimerUtil.createTimerTask(ClientLevelWrapper::tickCleanup);
+	
+	
 	private final ClientLevel level;
 	private final ConcurrentHashMap<BlockState, ClientBlockStateColorCache> blockColorCacheByBlockState = new ConcurrentHashMap<>();
 	
