@@ -19,11 +19,8 @@
 
 package com.seibel.distanthorizons.neoforge.mixins.client;
 
+import com.seibel.distanthorizons.common.commonMixins.MixinVanillaFogCommon;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -96,11 +93,11 @@ public class MixinFogRenderer
 	#endif
 	{
 		#if MC_VER < MC_1_21_6
-		boolean cancelFog = cancelFog(camera, fogMode);
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog(camera, fogMode);
 		#elif MC_VER < MC_1_21_6
-		boolean cancelFog = cancelFog(camera);
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog(camera);
 		#else
-		boolean cancelFog = cancelFog();
+		boolean cancelFog = MixinVanillaFogCommon.cancelFog();
 		#endif
 		
 		if (cancelFog)
@@ -162,53 +159,6 @@ public class MixinFogRenderer
 	}
 	
 	#endif
-	
-	
-	@Unique
-	#if MC_VER < MC_1_21_6
-	private static boolean cancelFog(Camera camera, FogMode fogMode)
-	#else
-	private static boolean cancelFog()
-	#endif
-	{
-		#if MC_VER < MC_1_21_6
-		Entity entity = camera.getEntity();
-		#elif MC_VER <= MC_1_21_10
-		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-		Entity entity = camera.getEntity();
-		#else
-		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-		Entity entity = camera.entity();	
-		#endif
-		
-		
-		boolean cameraNotInFluid = cameraNotInFluid(camera);
-		boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
-		
-		boolean cancelFog = !isSpecialFog;
-		cancelFog = cancelFog && cameraNotInFluid;
-		#if MC_VER < MC_1_21_6
-		cancelFog = cancelFog && (fogMode == FogMode.FOG_TERRAIN);
-		#endif
-		cancelFog = cancelFog && !SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class).isFogStateSpecial();
-		cancelFog = cancelFog && !Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
-		
-		return cancelFog;
-	}
-	
-	@Unique
-	private static boolean cameraNotInFluid(Camera camera)
-	{
-		#if MC_VER < MC_1_17_1
-		FluidState fluidState = camera.getFluidInCamera();
-		boolean cameraNotInFluid = fluidState.isEmpty();
-		#else
-		FogType fogTypes = camera.getFluidInCamera();
-		boolean cameraNotInFluid = fogTypes == FogType.NONE;
-		#endif
-		
-		return cameraNotInFluid;
-	}
 	
 	
 	
