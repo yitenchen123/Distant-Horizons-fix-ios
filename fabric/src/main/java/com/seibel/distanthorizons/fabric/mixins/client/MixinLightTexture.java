@@ -86,23 +86,6 @@ public class MixinLightTexture
 	public void render(LightmapRenderState renderState, CallbackInfo ci)
 	#endif
 	{
-		IMinecraftClientWrapper mc = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
-		if (mc == null)
-		{
-			return;
-		}
-		
-		IClientLevelWrapper clientLevel = ClientApi.RENDER_STATE.clientLevelWrapper;
-		if (clientLevel == null)
-		{
-			clientLevel = mc.getWrappedClientLevel();
-		}
-		
-		if (clientLevel == null)
-		{
-			return;
-		}
-		
 		// lazy initialization to make sure we don't call this too early
 		if (this.renderWrapper == null)
 		{
@@ -111,18 +94,18 @@ public class MixinLightTexture
 		
 		
 		#if MC_VER < MC_1_21_3
-		this.renderWrapper.updateLightmap(this.lightPixels, clientLevel);
+		this.renderWrapper.updateLightmap(this.lightPixels);
 		#elif MC_VER < MC_1_21_5
-		this.renderWrapper.setLightmapId(this.target.getColorTextureId(), clientLevel);
+		this.renderWrapper.setLightmapId(this.target.getColorTextureId());
 		#elif MC_VER <= MC_1_21_10
 		GlTexture glTexture = (GlTexture) this.texture;
-		this.renderWrapper.setLightmapId(glTexture.glId(), clientLevel);
+		this.renderWrapper.setLightmapId(glTexture.glId());
 		#else
 		// both options are available since the renderer can be changed to either Blaze3D or OpenGL
 		GlTexture glTexture = (GlTexture) this.texture;
-		this.renderWrapper.setLightmapId(glTexture.glId(), clientLevel);
+		this.renderWrapper.setLightmapId(glTexture.glId());
 		
-		this.renderWrapper.setLightmapGpuTexture(this.texture, clientLevel);
+		this.renderWrapper.setLightmapGpuTexture(this.texture);
 		#endif
 	}
 	
