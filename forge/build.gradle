@@ -22,6 +22,9 @@ dependencies {
     // TerraFirmaCraft
     addMod("curse.maven:TerraFirmaCraft-302973:4616004", rootProject.enable_terrafirmacraft)
 
+    addMod("maven.modrinth:oculus:${rootProject.oculus_version}", rootProject.enable_oculus)
+    addMod("maven.modrinth:embeddium:${rootProject.embeddium_version}", rootProject.enable_embeddium)
+
     // TODO: Check if this is still needed and if so ensure this code works for MC 26.1+
     // (potential) hack fix for MC 1.20.6 and later, force jopt-simple to be exactly 5.0.4 because Mojang ships that version, but some transitive dependencies request 6.0+
     def mcParts = rootProject.minecraft_version.split("\\.")

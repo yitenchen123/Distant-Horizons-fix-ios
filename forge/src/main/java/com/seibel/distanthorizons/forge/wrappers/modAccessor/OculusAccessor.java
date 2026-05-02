@@ -22,6 +22,7 @@ package com.seibel.distanthorizons.forge.wrappers.modAccessor;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
+import net.irisshaders.iris.api.v0.IrisApi;
 
 public class OculusAccessor implements IIrisAccessor
 {
@@ -44,14 +45,13 @@ public class OculusAccessor implements IIrisAccessor
 	@Override
 	public boolean isShaderPackInUse()
 	{
-		// assume shaders are always active
-		return true;
+		return IrisApi.getInstance().isShaderPackInUse();
 	}
 	
 	@Override
 	public boolean isRenderingShadowPass()
 	{
-		return false;
+		return IrisApi.getInstance().isRenderingShadowPass();
 	}
 	
 }
