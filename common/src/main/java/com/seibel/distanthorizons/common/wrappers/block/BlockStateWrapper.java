@@ -1026,7 +1026,11 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			// put if absent in case two threads deserialize at the same time
 			// unfortunately we can't put everything in a computeIfAbsent() since we also throw exceptions
 			WRAPPER_BY_RESOURCE_LOCATION.putIfAbsent(finalResourceStateString, foundWrapper);
-			WRAPPER_BY_BLOCK_STATE.putIfAbsent(foundWrapper.blockState, foundWrapper);
+			
+			if (foundWrapper != AIR)
+			{
+				WRAPPER_BY_BLOCK_STATE.putIfAbsent(foundWrapper.blockState, foundWrapper);
+			}
 		}
 	}
 	
