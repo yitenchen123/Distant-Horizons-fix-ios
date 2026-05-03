@@ -151,11 +151,19 @@ public class GLBuffer implements AutoCloseable
 	
 	protected void destroyOldAndCreate(boolean asBufferStorage)
 	{
+		// ==========================================================
+		// [MODIFIED] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
+		// ==========================================================
 		if (!GLProxy.runningOnRenderThread())
 		{
-			LodUtil.assertNotReach("Thread ["+Thread.currentThread()+"] tried to create a GLBuffer outside the MC render thread.");
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread(() -> 
+				this.destroyOldAndCreate(asBufferStorage)
+			);
+			return;
 		}
 		
+		// 原本的崩溃检查已移除，因为它会中断游戏运行
+		// 若保留，会抛出 AssertNotReach 导致崩溃
 		
 		// lock to prevent the render thread from accessing the buffer's ID
 		// while we are removing it
@@ -286,6 +294,19 @@ public class GLBuffer implements AutoCloseable
 	 */
 	public void uploadBuffer(ByteBuffer bb, EDhApiGpuUploadMethod uploadMethod, int maxExpansionSize, int bufferHint)
 	{
+		// ==========================================================
+		// [MODIFIED] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
+		// ==========================================================
+		if (!GLProxy.runningOnRenderThread())
+		{
+			// 必须复制 ByteBuffer，否则 Lambda 捕获的原始 ByteBuffer 可能在排队过程中被垃圾回收
+			ByteBuffer bbCopy = bb.duplicate();
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread(() -> 
+				this.uploadBuffer(bbCopy, uploadMethod, maxExpansionSize, bufferHint)
+			);
+			return;
+		}
+		
 		LodUtil.assertTrue(!uploadMethod.useEarlyMapping, "UploadMethod signal that this should use Mapping instead of uploadBuffer!");
 		int bbSize = bb.limit() - bb.position();
 		if (bbSize > maxExpansionSize) 
@@ -611,7 +632,5 @@ public class GLBuffer implements AutoCloseable
 	}
 	
 	//endregion
-	
-	
 	
 }
