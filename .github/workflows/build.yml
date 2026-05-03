@@ -11,7 +11,7 @@ on:
       mc_version:
         description: 'Minecraft Version'
         required: true
-        default: '1.21.1'
+        default: '1.21.11'
         type: choice
         options:
           - '1.21.11'
@@ -24,13 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # 1. 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. 修复子模块（GitHub Import 不会带子模块，需要手动拉取）
       - name: Fix coreSubProjects submodule
         run: |
           if [ ! -f "coreSubProjects/build.gradle" ]; then
@@ -40,58 +38,56 @@ jobs:
           else
             echo "coreSubProjects already exists"
           fi
-          ls -la coreSubProjects/
 
-      # 3. 设置 JDK 25
-      - name: Set up JDK 25
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '25'
+          java-version: '21'
           distribution: 'temurin'
 
-      # 4. Gradle 缓存
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-home-cache-cleanup: true
 
-      # 5. 给 gradlew 执行权限
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 6. 确定 MC 版本
+      # 关键修复：不再读取 gradle.properties 的 mcVer，直接指定 MC 版本
       - name: Set MC Version
         id: mcver
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "MC_VER=${{ github.event.inputs.mc_version }}" >> $GITHUB_ENV
+            VER="${{ github.event.inputs.mc_version }}"
           else
-            DEFAULT_VER=$(grep '^mcVer=' gradle.properties | cut -d'=' -f2 || echo '1.21.1')
-            echo "MC_VER=$DEFAULT_VER" >> $GITHUB_ENV
+            VER="1.21.11"  # 默认构建 1.21.11，不再读 gradle.properties
           fi
-          echo "Building for Minecraft ${{ env.MC_VER }}"
+          
+          echo "version=$VER" >> $GITHUB_OUTPUT
+          echo "MC_VER=$VER" >> $GITHUB_ENV
+          echo ">>> Building for Minecraft $VER <<<"
 
-      # 7. 构建（assemble 会自动处理所有子项目）
+      - name: Verify MC Version
+        run: |
+          if [ -z "${{ env.MC_VER }}" ]; then
+            echo "ERROR: MC_VER is empty!"
+            exit 1
+          fi
+          echo "Confirmed MC Version: ${{ env.MC_VER }}"
+
       - name: Build with Gradle
         run: ./gradlew assemble -PmcVer=${{ env.MC_VER }} --no-daemon --stacktrace
 
-      # 8. 合并 Jar
       - name: Merge Jars
         run: ./gradlew mergeJars -PmcVer=${{ env.MC_VER }} --no-daemon --stacktrace
 
-      # 9. 查看产物
       - name: List build outputs
         run: |
           echo "=== Fabric ==="
           ls -la fabric/build/libs/ 2>/dev/null || true
-          echo "=== Forge ==="
-          ls -la forge/build/libs/ 2>/dev/null || true
-          echo "=== NeoForge ==="
-          ls -la neoforge/build/libs/ 2>/dev/null || true
           echo "=== Merged ==="
           ls -la Merged/ 2>/dev/null || true
 
-      # 10. 上传 Fabric Jar
       - name: Upload Fabric Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -99,7 +95,6 @@ jobs:
           path: fabric/build/libs/*.jar
           if-no-files-found: warn
 
-      # 11. 上传合并后的 Jar（推荐用这个）
       - name: Upload Merged Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +102,6 @@ jobs:
           path: Merged/*.jar
           if-no-files-found: warn
 
-      # 12. 打 tag 时自动发 Release
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
