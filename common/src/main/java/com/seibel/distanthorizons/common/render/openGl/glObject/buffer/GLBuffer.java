@@ -26,9 +26,13 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.render.RenderThreadTaskHandler;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.util.objects.Pair;
+import com.seibel.distanthorizons.core.util.objects.pooling.PhantomLoggingHelper;
+import com.seibel.distanthorizons.coreapi.util.StringUtil;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL44;
 
@@ -36,6 +40,8 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,6 +56,18 @@ public class GLBuffer implements AutoCloseable
 	
 	private static final MinecraftGLWrapper GLMC = MinecraftGLWrapper.INSTANCE;
 	
+	
+	/** if enabled the number of GC'ed buffers will be logged */
+	private static final boolean LOG_PHANTOM_RECOVERY = false;
+	/** 
+	 * If enabled the GC'ed buffers allocation/upload stacks will be logged. 
+	 * Note: due to how the buffers are often run on the render thread,
+	 * these stacks will likely only be of limited use.
+	 * For more robust debugging it would likely be best to somehow track
+	 * the stacks of where these calls are happening before they're queued
+	 * for the render thread.
+	 */
+	private static final boolean LOG_PHANTOM_ALLOCATION_STACKS = false;
 	
 	public static final double BUFFER_EXPANSION_MULTIPLIER = 1.3;
 	public static final double BUFFER_SHRINK_TRIGGER = BUFFER_EXPANSION_MULTIPLIER * BUFFER_EXPANSION_MULTIPLIER;
@@ -73,6 +91,7 @@ public class GLBuffer implements AutoCloseable
 	private static final int PHANTOM_REF_CHECK_TIME_IN_MS = 5 * 1000;
 	private static final ConcurrentHashMap<PhantomReference<? extends GLBuffer>, Integer> PHANTOM_TO_BUFFER_ID = new ConcurrentHashMap<>();
 	private static final ConcurrentHashMap<Integer, PhantomReference<? extends GLBuffer>> BUFFER_ID_TO_PHANTOM = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<Integer, String> BUFFER_ID_TO_ALLOCATION_STRING = new ConcurrentHashMap<>();
 	private static final ReferenceQueue<GLBuffer> PHANTOM_REFERENCE_QUEUE = new ReferenceQueue<>();
 	private static final ThreadPoolExecutor CLEANUP_THREAD = ThreadUtil.makeSingleDaemonThreadPool("GLBuffer Cleanup");
 	
@@ -143,8 +162,9 @@ public class GLBuffer implements AutoCloseable
 		long writeStamp = renderStampLock.writeLock();
 		try
 		{
-			int oldId = this.id;
+			final int oldId = this.id;
 			this.id = GLMC.glGenBuffers();
+			//LOGGER.info("created [" + newId + "].");
 			
 			// destroy the old buffer
 			// after the new one has been created 
@@ -154,7 +174,7 @@ public class GLBuffer implements AutoCloseable
 			{
 				// this ID doesn't need to be tracked anymore
 				tryRemoveBufferIdFromPhantom(oldId);
-				destroyBufferIdNow(oldId);
+				destroyBufferIdNow(oldId, "destroyOldAndCreate");
 			}
 			
 			
@@ -164,6 +184,8 @@ public class GLBuffer implements AutoCloseable
 			PhantomReference<GLBuffer> phantom = new PhantomReference<>(this, PHANTOM_REFERENCE_QUEUE);
 			PHANTOM_TO_BUFFER_ID.put(phantom, this.id);
 			BUFFER_ID_TO_PHANTOM.put(this.id, phantom);
+			
+			this.updateAllocationStackTrace();
 		}
 		finally
 		{
@@ -196,7 +218,8 @@ public class GLBuffer implements AutoCloseable
 			this.id = 0;
 			this.size = 0;
 			
-			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete); });
+			//LOGGER.info("async destroy [" + idToDelete + "].");
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete, "destroyAsync"); });
 		}
 		finally
 		{
@@ -204,12 +227,12 @@ public class GLBuffer implements AutoCloseable
 		}
 	}
 	
-	private static void destroyBufferIdNow(int id)
+	private static void destroyBufferIdNow(int id, String cause)
 	{
 		// only delete valid buffers
 		if (id == 0)
 		{
-			LOGGER.warn("Attempted to destroy a buffer with ID 0, VRAM memory leaks may occur.");
+			LOGGER.warn("Attempted to destroy a buffer with ID 0, VRAM memory leaks may occur, cause: ["+cause+"].");
 			return;
 		}
 		
@@ -225,17 +248,22 @@ public class GLBuffer implements AutoCloseable
 	/** should be called before {@link GLBuffer#destroyBufferIdNow} */
 	private static void tryRemoveBufferIdFromPhantom(int id)
 	{
-		if (BUFFER_ID_TO_PHANTOM.containsKey(id))
+		// will contain nothing if stack tracking isn't enabled
+		BUFFER_ID_TO_ALLOCATION_STRING.remove(id);
+		
+		PhantomReference<? extends GLBuffer> phantom = BUFFER_ID_TO_PHANTOM.remove(id);
+		if (phantom != null)
 		{
-			Reference<? extends GLBuffer> phantom = BUFFER_ID_TO_PHANTOM.get(id);
-			
 			// if we are manually closing this buffer, we don't want the phantom reference to accidentally close it again
 			// this can cause a race condition were we accidentally delete an in-use buffer and cause NVIDIA
 			// to throw an EXCEPTION_ACCESS_VIOLATION when we attempt to render it
 			phantom.clear();
 			
-			PHANTOM_TO_BUFFER_ID.remove(phantom);
-			BUFFER_ID_TO_PHANTOM.remove(id);
+			Integer phantomId = PHANTOM_TO_BUFFER_ID.remove(phantom);
+			if (phantomId == null)
+			{
+				LOGGER.warn("No Phantom->ID binding stored for ID ["+id+"]");
+			}
 		}
 		else
 		{
@@ -343,6 +371,8 @@ public class GLBuffer implements AutoCloseable
 			GL32.glBufferData(target, bb, bufferDataHint);
 		}
 		this.size = bbSize;
+		
+		this.updateAllocationStackTrace();
 	}
 	/** Requires the buffer to be bound */
 	protected void uploadSubData(ByteBuffer bb, int maxExpansionSize, int bufferDataHint)
@@ -372,6 +402,8 @@ public class GLBuffer implements AutoCloseable
 		{
 			GL32.glBufferSubData(target, 0, bb);
 		}
+		
+		this.updateAllocationStackTrace();
 	}
 	
 	//endregion
@@ -481,6 +513,22 @@ public class GLBuffer implements AutoCloseable
 		}
 	}
 	
+	/** 
+	 * used to help track down leaks where the buffer isn't properly closed
+	 * Note: this probably needs extending to accept a stack trace from outside where it's being called
+	 * since it's often called on the render thread in an un-helpful location.
+	 */
+	public void updateAllocationStackTrace()
+	{
+		if (LOG_PHANTOM_ALLOCATION_STACKS)
+		{
+			StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+			StackTraceElement[] trimmedElements = Arrays.copyOfRange(stackTraceElements, 4, stackTraceElements.length);
+			String stack = StringUtil.join("\n", trimmedElements).intern();
+			BUFFER_ID_TO_ALLOCATION_STRING.put(this.id, stack);
+		}
+	}
+	
 	//endregion
 	
 	
@@ -492,8 +540,13 @@ public class GLBuffer implements AutoCloseable
 	
 	private static void runPhantomReferenceCleanupLoop()
 	{
+		// these arrays are stored here so they don't have to be re-allocated each loop
+		ArrayList<Pair<String, AtomicInteger>> allocationStackTraceCountPairList = new ArrayList<>();
+		
 		while (true)
 		{
+			allocationStackTraceCountPairList.clear();
+			
 			try
 			{
 				try
@@ -502,20 +555,53 @@ public class GLBuffer implements AutoCloseable
 				}
 				catch (InterruptedException ignore) { }
 				
+				int collectedCount = 0;
 				
 				Reference<? extends GLBuffer> phantomRef = PHANTOM_REFERENCE_QUEUE.poll();
 				while (phantomRef != null)
 				{
 					// destroy the buffer if it hasn't been cleared yet
-					if (PHANTOM_TO_BUFFER_ID.containsKey(phantomRef))
+					Integer idRef = PHANTOM_TO_BUFFER_ID.remove((PhantomReference<? extends GLBuffer>)phantomRef); // cast to make IntelliJ happy
+					if (idRef != null)
 					{
-						int id = PHANTOM_TO_BUFFER_ID.get(phantomRef);
-						RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer phantom destroy", () -> { destroyBufferIdNow(id); });
-						//LOGGER.warn("Buffer Phantom collected, ID: ["+id+"]");
+						BUFFER_ID_TO_PHANTOM.remove(idRef);
+						final int id = idRef;
+						RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer phantom destroy", () -> { destroyBufferIdNow(id, "runPhantomReferenceCleanupLoop"); });
+						//LOGGER.info("Buffer Phantom collected, ID: ["+id+"]");
+						
+						if (LOG_PHANTOM_ALLOCATION_STACKS) // stack trace shouldn't be null, but just in case
+						{
+							String stack = BUFFER_ID_TO_ALLOCATION_STRING.get(idRef);
+							PhantomLoggingHelper.putAndIncrementTrackingString(stack, allocationStackTraceCountPairList);
+						}
+					}
+					else
+					{
+						LOGGER.warn("Failed to find Buffer ID for phantom reference: ["+phantomRef+"]");
 					}
 					
+					
+					collectedCount++;
 					phantomRef = PHANTOM_REFERENCE_QUEUE.poll();
 				}
+				
+				
+				
+				if (LOG_PHANTOM_RECOVERY)
+				{
+					// we only want to log when something has been returned
+					if (collectedCount != 0)
+					{
+						LOGGER.warn("GLBuffer phantom recovered: ["+ F3Screen.NUMBER_FORMAT.format(collectedCount)+"].");
+						
+						// log stack traces if present
+						if (LOG_PHANTOM_ALLOCATION_STACKS)
+						{
+							PhantomLoggingHelper.LogAllocationStackTracePairCounts(LOGGER, allocationStackTraceCountPairList);
+						}
+					}
+				}
+				
 			}
 			catch (Exception e)
 			{
