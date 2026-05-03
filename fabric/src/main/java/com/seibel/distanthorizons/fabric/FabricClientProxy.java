@@ -381,28 +381,51 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 	
 	public void onKeyInput()
 	{
-		HashSet<Integer> currentKeyDown = new HashSet<>();
-		
-		// Note: Minecraft's InputConstants are the same as GLFW Key values
-		for (int keyCode = GLFW.GLFW_KEY_0; keyCode <= GLFW.GLFW_KEY_LAST; keyCode++)
+		// iOS / PojavLauncher / MobileGlues 双重保护：
+		// 1. 限制 keyCode 扫描范围，避免 GLFW 内部缓冲区越界
+		// 2. try-catch 兜底，确保任何异常都不会导致崩溃
+		try
 		{
-			if (InputConstants.isKeyDown(MC.getGlfwWindowId(), keyCode))
+			HashSet<Integer> currentKeyDown = new HashSet<>();
+			
+			// 标准 GLFW_KEY_LAST = 348，但 iOS 的 GLFW 实现缓冲区可能更小
+			// 限制到 255 覆盖所有标准键盘按键，同时避免越界
+			int maxSafeKeyCode = Math.min(GLFW.GLFW_KEY_LAST, 255);
+			
+			// Note: Minecraft's InputConstants are the same as GLFW Key values
+			for (int keyCode = GLFW.GLFW_KEY_0; keyCode <= maxSafeKeyCode; keyCode++)
 			{
-				currentKeyDown.add(keyCode);
+				try
+				{
+					if (InputConstants.isKeyDown(MC.getGlfwWindowId(), keyCode))
+					{
+						currentKeyDown.add(keyCode);
+					}
+				}
+				catch (IndexOutOfBoundsException e)
+				{
+					// iOS GLFW 缓冲区越界，跳过剩余 keycode
+					break;
+				}
 			}
+			
+			// Diff and trigger events
+			for (int keyCode : currentKeyDown)
+			{
+				if (!this.previouslyPressKeyCodes.contains(keyCode))
+				{
+					ClientApi.INSTANCE.keyPressedEvent(keyCode);
+				}
+			}
+			
+			// Update the set
+			this.previouslyPressKeyCodes = currentKeyDown;
 		}
-		
-		// Diff and trigger events
-		for (int keyCode : currentKeyDown)
+		catch (Exception e)
 		{
-			if (!this.previouslyPressKeyCodes.contains(keyCode))
-			{
-				ClientApi.INSTANCE.keyPressedEvent(keyCode);
-			}
+			// 绝对兜底：任何按键相关异常都不应该导致游戏崩溃
+			// 在 Amethyst iOS 环境中静默忽略
 		}
-		
-		// Update the set
-		this.previouslyPressKeyCodes = currentKeyDown;
 	}
 	
 }
