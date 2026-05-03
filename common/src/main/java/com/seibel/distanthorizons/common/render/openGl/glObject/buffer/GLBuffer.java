@@ -152,18 +152,16 @@ public class GLBuffer implements AutoCloseable
 	protected void destroyOldAndCreate(boolean asBufferStorage)
 	{
 		// ==========================================================
-		// [MODIFIED] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
+		// [修正] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
 		// ==========================================================
 		if (!GLProxy.runningOnRenderThread())
 		{
-			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread(() -> 
+            // 两个字符串参数分别是 "任务标签" 和 "Runnable"
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyOldAndCreate", () -> 
 				this.destroyOldAndCreate(asBufferStorage)
 			);
 			return;
 		}
-		
-		// 原本的崩溃检查已移除，因为它会中断游戏运行
-		// 若保留，会抛出 AssertNotReach 导致崩溃
 		
 		// lock to prevent the render thread from accessing the buffer's ID
 		// while we are removing it
@@ -172,7 +170,6 @@ public class GLBuffer implements AutoCloseable
 		{
 			final int oldId = this.id;
 			this.id = GLMC.glGenBuffers();
-			//LOGGER.info("created [" + newId + "].");
 			
 			// destroy the old buffer
 			// after the new one has been created 
@@ -226,7 +223,6 @@ public class GLBuffer implements AutoCloseable
 			this.id = 0;
 			this.size = 0;
 			
-			//LOGGER.info("async destroy [" + idToDelete + "].");
 			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer destroyAsync", () -> { destroyBufferIdNow(idToDelete, "destroyAsync"); });
 		}
 		finally
@@ -295,13 +291,13 @@ public class GLBuffer implements AutoCloseable
 	public void uploadBuffer(ByteBuffer bb, EDhApiGpuUploadMethod uploadMethod, int maxExpansionSize, int bufferHint)
 	{
 		// ==========================================================
-		// [MODIFIED] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
+		// [修正] 线程安全保护：如果不是渲染线程，排队到渲染线程执行
 		// ==========================================================
 		if (!GLProxy.runningOnRenderThread())
 		{
 			// 必须复制 ByteBuffer，否则 Lambda 捕获的原始 ByteBuffer 可能在排队过程中被垃圾回收
 			ByteBuffer bbCopy = bb.duplicate();
-			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread(() -> 
+			RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer uploadBuffer", () -> 
 				this.uploadBuffer(bbCopy, uploadMethod, maxExpansionSize, bufferHint)
 			);
 			return;
@@ -588,7 +584,6 @@ public class GLBuffer implements AutoCloseable
 						BUFFER_ID_TO_PHANTOM.remove(idRef);
 						final int id = idRef;
 						RenderThreadTaskHandler.INSTANCE.queueRunningOnRenderThread("GLBuffer phantom destroy", () -> { destroyBufferIdNow(id, "runPhantomReferenceCleanupLoop"); });
-						//LOGGER.info("Buffer Phantom collected, ID: ["+id+"]");
 						
 						if (LOG_PHANTOM_ALLOCATION_STACKS) // stack trace shouldn't be null, but just in case
 						{
