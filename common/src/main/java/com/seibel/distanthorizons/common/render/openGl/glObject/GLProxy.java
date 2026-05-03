@@ -127,9 +127,19 @@ public class GLProxy
 	private GLProxy() throws IllegalStateException
 	{
 		// this must be created on minecraft's render context to work correctly
-		if (GLFW.glfwGetCurrentContext() == 0L)
+		
+		// ==========================================
+		// iOS / PojavLauncher / Amethyst / MobileGlues 兼容修复
+		// ==========================================
+		long currentContext = GLFW.glfwGetCurrentContext();
+		if (currentContext == 0L)
 		{
-			throw new IllegalStateException(GLProxy.class.getSimpleName() + " was created outside the render thread!");
+			// 在 iOS 上 glfwGetCurrentContext() 可能返回 0，即使我们在渲染线程上
+			// 记录警告但继续初始化，让 DH 尝试在 OpenGL ES 环境下工作
+			LOGGER.warn(GLProxy.class.getSimpleName() + ": glfwGetCurrentContext() returned 0. "
+					+ "This is expected on iOS/PojavLauncher with MobileGlues. "
+					+ "Attempting best-effort initialization.");
+			// throw new IllegalStateException(GLProxy.class.getSimpleName() + " was created outside the render thread!");
 		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
