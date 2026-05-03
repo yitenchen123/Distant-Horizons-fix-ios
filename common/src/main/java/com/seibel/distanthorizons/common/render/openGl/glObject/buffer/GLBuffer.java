@@ -214,22 +214,11 @@ public class GLBuffer implements AutoCloseable
 		}
 		
 		bufferCount.decrementAndGet();
+		GLMC.glDeleteBuffers(id);
 		
-		// destroy the buffer if it exists,
-		// the buffer may not exist if the destroy method is called twice
-		if (GL32.glIsBuffer(id))
+		if (Config.Client.Advanced.Debugging.logBufferGarbageCollection.get())
 		{
-			GLMC.glDeleteBuffers(id);
-			
-			if (Config.Client.Advanced.Debugging.logBufferGarbageCollection.get())
-			{
-				LOGGER.info("destroyed buffer [" + id + "], remaining: [" + BUFFER_ID_TO_PHANTOM.size() + "]");
-			}
-		}
-		else
-		{
-			// shouldn't happen, but just in case
-			LOGGER.warn("Attempted to destroy a non buffer object with ID ["+id+"].");
+			LOGGER.info("destroyed buffer [" + id + "], remaining: [" + BUFFER_ID_TO_PHANTOM.size() + "], cause: ["+cause+"].");
 		}
 	}
 	
